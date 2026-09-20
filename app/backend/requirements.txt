@@ -1,0 +1,6 @@
+# Backend web layer. `vision` (imported in-process, see main.py) is
+# installed separately from ../../vision — see its own pyproject.toml for
+# the CV/ML stack (cv2, onnxruntime) and the Jetson-specific install notes.
+fastapi>=0.110
+uvicorn[standard]>=0.29
+python-multipart>=0.0.9

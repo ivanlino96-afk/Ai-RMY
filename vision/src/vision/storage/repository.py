@@ -51,7 +51,8 @@ class Match(NamedTuple):
 
 class FaceRepository(object):
     def __init__(self, config=None):
-        self._config = config or StorageConfig()
+        self.config = config or StorageConfig()
+        self._config = self.config
         db_dir = os.path.dirname(self._config.db_path)
         if db_dir:
             os.makedirs(db_dir, exist_ok=True)

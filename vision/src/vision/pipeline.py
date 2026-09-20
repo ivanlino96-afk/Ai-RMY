@@ -94,7 +94,8 @@ class SharedState(object):
 
 class Pipeline(object):
     def __init__(self, config=None, repository=None):
-        self._config = config or PipelineConfig()
+        self.config = config or PipelineConfig()
+        self._config = self.config
         self._repository = repository or FaceRepository(self._config.storage)
         self.state = SharedState()
 
@@ -134,11 +135,33 @@ class Pipeline(object):
     def center(self):
         self._serial_link.send_goto(0.0, 0.0)
 
-    def _run(self):
-        import cv2  # noqa: local import, see module docstring
+    @property
+    def tracking_enabled(self):
+        return self._tracking_enabled
 
-        self._camera = Camera(self._config.camera)
-        self._detector = YuNetDetector(self._config.detection)
+    @property
+    def serial_connected(self):
+        return self._serial_link.connected
+
+    @property
+    def last_telemetry(self):
+        return self._serial_link.last_telemetry
+
+    def _run(self):
+        try:
+            import cv2  # noqa: local import, see module docstring
+
+            self._camera = Camera(self._config.camera)
+            self._detector = YuNetDetector(self._config.detection)
+        except Exception:
+            logger.exception(
+                "vision pipeline disabled: camera/detector unavailable "
+                "(missing cv2, no CV-capable OpenCV build, or no camera "
+                "device) — API endpoints still work, but video/tracking "
+                "will not run"
+            )
+            return
+
         try:
             self._embedder = FaceEmbedder(self._config.recognition)
         except Exception:
