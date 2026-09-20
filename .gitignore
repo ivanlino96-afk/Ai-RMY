@@ -26,3 +26,6 @@ app/frontend/.vite/
 
 # OS
 .DS_Store
+
+# Claude Code runtime state
+.claude/
