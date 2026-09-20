@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vision"
+version = "0.1.0"
+description = "Face detection/recognition/tracking engine for the Ai-RMY gimbal. Imported in-process by app/backend."
+requires-python = ">=3.6"
+dependencies = [
+    "numpy",
+    "pyserial",
+]
+
+# opencv-python-headless / onnxruntime are intentionally NOT pinned here as
+# hard dependencies: on the actual Jetson Nano (JetPack 4.6, Python 3.6) they
+# come from a DNN-capable OpenCV build and an onnxruntime wheel sourced
+# specifically for that platform, not plain pip packages — see
+# docs/architecture.md "Riesgos conocidos". Modules that need cv2/onnxruntime
+# import them lazily so the rest of this package (tracking math, storage,
+# serial protocol, config) stays testable on any machine without that stack
+# installed.
+[project.optional-dependencies]
+dev = ["pytest"]
+cv-dev = ["opencv-python-headless", "onnxruntime"]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,28 @@
+# Firmware (PlatformIO)
+firmware/.pio/
+firmware/.vscode/
+
+# Python (vision + backend)
+**/__pycache__/
+**/*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Vision runtime data — never commit biometric data or large models
+vision/data/
+vision/models/*.onnx
+!vision/models/.gitkeep
+
+# Node / frontend
+app/frontend/node_modules/
+app/frontend/dist/
+app/frontend/.vite/
+
+# Env / secrets
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
