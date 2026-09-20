@@ -219,6 +219,8 @@ class Pipeline(object):
         jpeg = buf.tobytes() if ok else None
 
         event = {
+            "frame_width": width,
+            "frame_height": height,
             "detection": None
             if target is None
             else {

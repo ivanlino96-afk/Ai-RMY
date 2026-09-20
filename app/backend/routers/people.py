@@ -4,7 +4,7 @@ import uuid
 from typing import List
 
 from fastapi import APIRouter, Depends, Form, HTTPException, UploadFile
-from fastapi.responses import Response
+from fastapi.responses import FileResponse, Response
 
 from app.backend.dependencies import get_repository
 from app.backend.schemas import PersonOut, PersonUpdate
@@ -32,15 +32,20 @@ async def create_person(
     repository=Depends(get_repository),
 ):
     image_bytes = await photo.read()
-    try:
-        embedding = embed_face_from_image_bytes(image_bytes)
-    except NoFaceDetected:
-        raise HTTPException(status_code=422, detail="no face detected in photo")
+    embedding = _embed_or_503(image_bytes)
 
     person_id = repository.add_person(name, notes)
     photo_path = _save_photo(repository, person_id, image_bytes)
     repository.add_embedding(person_id, embedding, photo_path)
     return _to_out(repository.get_person(person_id))
+
+
+@router.get("/{person_id}/photo")
+def get_person_photo(person_id: int, repository=Depends(get_repository)):
+    photo_path = repository.latest_photo_path(person_id)
+    if photo_path is None or not os.path.isfile(photo_path):
+        raise HTTPException(status_code=404, detail="no photo for this person")
+    return FileResponse(photo_path, media_type="image/jpeg")
 
 
 @router.post("/{person_id}/photos", status_code=201)
@@ -49,10 +54,7 @@ async def add_photo(person_id: int, photo: UploadFile, repository=Depends(get_re
         raise HTTPException(status_code=404, detail="person not found")
 
     image_bytes = await photo.read()
-    try:
-        embedding = embed_face_from_image_bytes(image_bytes)
-    except NoFaceDetected:
-        raise HTTPException(status_code=422, detail="no face detected in photo")
+    embedding = _embed_or_503(image_bytes)
 
     photo_path = _save_photo(repository, person_id, image_bytes)
     repository.add_embedding(person_id, embedding, photo_path)
@@ -71,6 +73,20 @@ def delete_person(person_id: int, repository=Depends(get_repository)):
     if not repository.delete_person(person_id):
         raise HTTPException(status_code=404, detail="person not found")
     return Response(status_code=204)
+
+
+def _embed_or_503(image_bytes):
+    try:
+        return embed_face_from_image_bytes(image_bytes)
+    except NoFaceDetected:
+        raise HTTPException(status_code=422, detail="no face detected in photo")
+    except (ImportError, RuntimeError) as exc:
+        # cv2/onnxruntime missing or the JetPack 4.6 OpenCV build lacks
+        # FaceDetectorYN — see vision/detection/yunet.py and
+        # AGENTS.md's Python 3.6 compatibility note. Enrollment can't work
+        # without the CV stack, but this should read as a clear 503, not a
+        # raw stack trace.
+        raise HTTPException(status_code=503, detail="face recognition stack unavailable: %s" % exc)
 
 
 def _save_photo(repository, person_id, image_bytes):

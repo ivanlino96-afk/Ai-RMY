@@ -130,6 +130,15 @@ class FaceRepository(object):
             (pid, np.frombuffer(blob, dtype=np.float32)) for pid, blob in rows
         ]
 
+    def latest_photo_path(self, person_id):
+        row = self._conn.execute(
+            "SELECT photo_path FROM embeddings "
+            "WHERE person_id = ? AND photo_path IS NOT NULL "
+            "ORDER BY created_at DESC LIMIT 1",
+            (person_id,),
+        ).fetchone()
+        return row[0] if row else None
+
     # -- matching -----------------------------------------------------------
 
     def find_best_match(self, vector, threshold):

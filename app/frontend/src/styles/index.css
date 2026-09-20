@@ -1,0 +1,52 @@
+@import "tailwindcss";
+
+@theme {
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-void: #090c10;
+  --color-panel: #10151b;
+  --color-hairline: #2b3742;
+  --color-ink: #d7e4e8;
+  --color-ink-dim: #6b7c85;
+  --color-lock: #4cffb0;
+  --color-warn: #ffb454;
+  --color-alert: #ff5c5c;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-void text-ink font-mono antialiased;
+  }
+
+  ::selection {
+    @apply bg-lock/30 text-ink;
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .field-label {
+    @apply text-[11px] tracking-[0.14em] text-ink-dim uppercase;
+  }
+
+  @keyframes lock-pulse {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.45;
+    }
+  }
+
+  .animate-lock-pulse {
+    animation: lock-pulse 1.4s ease-in-out infinite;
+  }
+}

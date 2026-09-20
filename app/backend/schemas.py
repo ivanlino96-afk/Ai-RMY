@@ -33,6 +33,8 @@ class TelemetryOut(BaseModel):
 
 
 class EventOut(BaseModel):
+    frame_width: int
+    frame_height: int
     detection: Optional[DetectionOut] = None
     telemetry: Optional[TelemetryOut] = None
     serial_connected: bool
