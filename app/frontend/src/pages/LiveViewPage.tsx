@@ -11,13 +11,14 @@ interface LiveViewPageProps {
 
 export function LiveViewPage({ detection }: LiveViewPageProps) {
   const { data: status } = useGimbalStatus()
+  const detections = detection.event?.detections ?? []
 
   return (
     <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
       <div className="lg:col-span-2">
         <CornerBracketPanel
           title="Camera"
-          color={detection.event?.detection ? 'lock' : 'hairline'}
+          color={detections.length > 0 ? 'lock' : 'hairline'}
           padded={false}
         >
           <LiveVideoView event={detection.event} />
@@ -25,7 +26,7 @@ export function LiveViewPage({ detection }: LiveViewPageProps) {
       </div>
 
       <div className="space-y-6">
-        <TrackedPersonPanel detection={detection.event?.detection ?? null} />
+        <TrackedPersonPanel detections={detections} />
         <GimbalStatusPanel status={status} />
       </div>
     </div>

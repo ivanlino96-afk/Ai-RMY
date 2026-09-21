@@ -13,6 +13,7 @@ YuNet decode/NMS. Treat that as a dedicated milestone, not a fallback to
 silently swallow here.
 """
 
+import threading
 from typing import List, NamedTuple, Tuple
 
 from vision.config import DetectionConfig
@@ -48,6 +49,16 @@ class YuNetDetector(object):
         self._config = config or DetectionConfig()
         self._cv2 = cv2
         self._frame_size = frame_size
+        # Guards `_frame_size` + the underlying cv2 net across `detect()`
+        # calls: the live pipeline thread and an in-flight enrollment
+        # request both call `.detect()` on this same instance (see
+        # app/backend/routers/people.py's `_new_enrollment_session`), and
+        # `setInputSize()` followed by `.detect()` is not atomic. Without
+        # this lock, two frames of different shapes racing here corrupt
+        # the net's expected input shape (observed as an OpenCV DNN
+        # "Shape mismatch"/`forwardGraph` assertion crashing the pipeline
+        # thread).
+        self._lock = threading.Lock()
         create = getattr(cv2, "FaceDetectorYN_create", None) or cv2.FaceDetectorYN.create
         self._detector = create(
             self._config.model_path,
@@ -67,9 +78,9 @@ class YuNetDetector(object):
         """Returns a list of Detection, largest-area first (MVP: single-face
         tracking picks detections[0] as the target — see AGENTS.md)."""
         height, width = frame.shape[:2]
-        self.set_frame_size(width, height)
-
-        _, faces = self._detector.detect(frame)
+        with self._lock:
+            self.set_frame_size(width, height)
+            _, faces = self._detector.detect(frame)
         if faces is None:
             return []
 

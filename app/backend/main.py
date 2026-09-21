@@ -23,6 +23,7 @@ async def lifespan(app: FastAPI):
     pipeline = Pipeline(config=config, repository=repository)
     app.state.repository = repository
     app.state.pipeline = pipeline
+    app.state.enrollment_sessions = {}
     pipeline.start()
     try:
         yield

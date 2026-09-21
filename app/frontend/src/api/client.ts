@@ -7,11 +7,25 @@ export class ApiError extends Error {
   }
 }
 
+// FastAPI's HTTPException bodies are `{"detail": "..."}` — surface that
+// message directly (it's already user-facing text, e.g. RF-7's duplicate
+// notice) instead of the raw JSON blob.
+function errorMessageFrom(status: number, text: string): string {
+  if (!text) return String(status)
+  try {
+    const body = JSON.parse(text) as { detail?: unknown }
+    if (typeof body.detail === 'string') return body.detail
+  } catch {
+    // not JSON — fall through to the raw text below
+  }
+  return text
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const res = await fetch(path, init)
   if (!res.ok) {
-    const detail = await res.text()
-    throw new ApiError(res.status, detail || res.statusText)
+    const text = await res.text()
+    throw new ApiError(res.status, errorMessageFrom(res.status, text) || res.statusText)
   }
   if (res.status === 204) {
     return undefined as T

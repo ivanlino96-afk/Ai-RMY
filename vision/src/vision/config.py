@@ -27,14 +27,18 @@ class RecognitionConfig(NamedTuple):
     model_path: str = "vision/models/w600k_mbf.onnx"
     input_size: int = 112
     # Cosine similarity >= this counts as a match. Conservative on purpose:
-    # prefer "Unknown" over a false positive (see AGENTS.md).
-    match_threshold: float = 0.45
+    # prefer "Unknown" over a false positive (see AGENTS.md and RNF-2).
+    match_threshold: float = 0.90
+    # Minimum cross-photo cosine similarity required between the 3 enrollment
+    # photos for the enrollment to be accepted (RF-5).
+    enrollment_consistency_threshold: float = 0.90
     # Recognition is far more expensive than detection, so it only runs
     # every Nth frame on the currently tracked face crop.
     run_every_n_frames: int = 5
-    # Consecutive misses before a cached name reverts to "Unknown", so the
-    # label doesn't flicker between frames.
-    label_decay_frames: int = 8
+    # How long a recognized identity is kept for a face that leaves and
+    # re-enters frame, instead of being re-evaluated as a new detection
+    # (RF-14).
+    identity_memory_seconds: float = 30.0
 
 
 class TrackingConfig(NamedTuple):

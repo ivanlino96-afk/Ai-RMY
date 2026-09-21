@@ -21,6 +21,14 @@ def get_repository(connection: HTTPConnection) -> FaceRepository:
     return connection.app.state.repository
 
 
+def get_enrollment_sessions(connection: HTTPConnection) -> dict:
+    """In-memory {session_id: {"session": EnrollmentSession, "person_id":
+    int | None}} store for guided-capture sessions (T14/T16). Ephemeral by
+    design (see vision/enroll.py) -- lost on restart, which is fine since an
+    abandoned session must leave no trace anyway."""
+    return connection.app.state.enrollment_sessions
+
+
 def get_current_user():
     """No-op auth stub — MVP is LAN-only with no authentication (see
     AGENTS.md). Kept so routes don't need rewriting when auth is added."""

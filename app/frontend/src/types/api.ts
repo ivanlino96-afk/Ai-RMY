@@ -3,8 +3,19 @@
 export interface Person {
   id: number
   name: string
+  age: number
+  email: string
+  phone: string
   notes: string
   created_at: number
+}
+
+export interface PersonInput {
+  name: string
+  age: number
+  email: string
+  phone: string
+  notes?: string
 }
 
 export interface Detection {
@@ -22,12 +33,13 @@ export interface Telemetry {
 }
 
 export interface DetectionEvent {
-  frame_width: number
-  frame_height: number
-  detection: Detection | null
+  frame_width: number | null
+  frame_height: number | null
+  detections: Detection[]
   telemetry: Telemetry | null
   serial_connected: boolean
   tracking_enabled: boolean
+  camera_connected: boolean
 }
 
 export interface GimbalStatus {
@@ -39,4 +51,18 @@ export interface GimbalStatus {
 export interface Health {
   status: string
   version: string
+}
+
+// Mirrors vision.enroll.POSE_ORDER.
+export type Pose = 'front' | 'left' | 'right'
+
+export interface EnrollmentSessionStart {
+  session_id: string
+  next_pose: Pose
+}
+
+export interface EnrollmentPhotoResult {
+  pose: Pose
+  next_pose: Pose | null
+  is_complete: boolean
 }

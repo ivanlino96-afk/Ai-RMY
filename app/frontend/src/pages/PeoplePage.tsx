@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { usePeople } from '../api/people'
 import { PeopleList } from '../components/people/PeopleList'
-import { PersonFormModal } from '../components/people/PersonFormModal'
+import { EnrollmentFlow } from '../components/people/EnrollmentFlow'
 
 export function PeoplePage() {
   const { data: people, isLoading } = usePeople()
@@ -26,7 +26,9 @@ export function PeoplePage() {
         <PeopleList people={people ?? []} />
       )}
 
-      {enrolling ? <PersonFormModal onClose={() => setEnrolling(false)} /> : null}
+      {enrolling ? (
+        <EnrollmentFlow onClose={() => setEnrolling(false)} onComplete={() => setEnrolling(false)} />
+      ) : null}
     </div>
   )
 }

@@ -2,9 +2,10 @@
 
 One iteration feeds three consumers from a single pass (see
 docs/architecture.md's end-to-end flow):
-  1. a `move_delta` command to the ESP32 (tracking correction)
+  1. a `move_delta` command to the ESP32 (tracking correction, largest face)
   2. the latest annotated JPEG frame (for the MJPEG endpoint)
-  3. a structured event (bbox/name/telemetry) for WebSocket subscribers
+  3. a structured event (all detections/name-or-Desconocido/telemetry) for
+     WebSocket subscribers
 
 This is why `app/backend` imports this package in-process instead of
 calling it as a separate service: the video the operator watches and the
@@ -29,29 +30,70 @@ from vision.tracking.controller import PixelOffset, TrackingController
 
 logger = logging.getLogger(__name__)
 
-UNKNOWN_LABEL = "Unknown"
+# RF-13: "Desconocido" in Spanish, not "Unknown" -- this is a user-facing
+# label the frontend renders verbatim, not an internal identifier.
+UNKNOWN_LABEL = "Desconocido"
+
+_KNOWN_COLOR = (0, 255, 0)  # BGR green -- recognized match, RF-12
+_UNKNOWN_COLOR = (0, 0, 255)  # BGR red -- no match >= threshold, RF-13
 
 
-class _LabelCache(object):
-    """Smooths recognition output so the label doesn't flicker between a
-    name and "Unknown" between the sparse frames recognition runs on."""
+def _center_distance(a, b):
+    return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
 
-    def __init__(self, decay_frames):
-        self._decay_frames = decay_frames
-        self._name = None
-        self._remaining = 0
 
-    def update_from_match(self, match):
-        if match is not None:
-            self._name = match.name
-            self._remaining = self._decay_frames
-        elif self._remaining > 0:
-            self._remaining -= 1
-        else:
-            self._name = None
+class _IdentityMemory(object):
+    """Per-face recognized-identity memory with a time window (RF-14).
 
-    def current(self):
-        return self._name if self._remaining > 0 else None
+    Recognition only runs every `run_every_n_frames`-th frame (it's far
+    more expensive than detection), so between those frames -- and across
+    a face briefly leaving and re-entering the frame -- this remembers the
+    last label seen for the closest face position, for up to
+    `window_seconds`. Past that window a reappearing face is evaluated as
+    a brand new detection, per RF-14's second clause.
+
+    Faces are correlated across frames by nearest bbox-center distance:
+    this codebase has no persistent multi-object tracker, and proximity is
+    the simplest signal available for "is this the same face as before".
+    """
+
+    def __init__(self, window_seconds, max_center_distance=75.0, time_fn=time.time):
+        self._window_seconds = window_seconds
+        self._max_center_distance = max_center_distance
+        self._time_fn = time_fn
+        self._entries = []
+
+    def remember(self, center, label, now=None):
+        now = self._time_fn() if now is None else now
+        entry = self._closest(center, now)
+        if entry is None:
+            entry = {}
+            self._entries.append(entry)
+        entry["center"] = center
+        entry["label"] = label
+        entry["last_seen"] = now
+
+    def recall(self, center, now=None):
+        """Returns (label, found). `found` is False if no still-fresh entry
+        is close enough to `center` -- the caller should treat that as an
+        unevaluated face, not assume "Desconocido"."""
+        now = self._time_fn() if now is None else now
+        entry = self._closest(center, now)
+        if entry is None:
+            return None, False
+        return entry["label"], True
+
+    def _closest(self, center, now):
+        best = None
+        best_dist = None
+        for entry in self._entries:
+            if now - entry["last_seen"] > self._window_seconds:
+                continue
+            dist = _center_distance(center, entry["center"])
+            if dist <= self._max_center_distance and (best_dist is None or dist < best_dist):
+                best = entry
+                best_dist = dist
+        return best
 
 
 class SharedState(object):
@@ -101,10 +143,11 @@ class Pipeline(object):
 
         self._tracking_controller = TrackingController(self._config.tracking)
         self._serial_link = SerialLink(self._config.serial_link)
-        self._label_cache = _LabelCache(self._config.recognition.label_decay_frames)
+        self._identity_memory = _IdentityMemory(self._config.recognition.identity_memory_seconds)
 
         self._tracking_enabled = True
         self._frame_count = 0
+        self._camera_connected = True
         self._stop_event = threading.Event()
         self._thread = None
 
@@ -147,6 +190,17 @@ class Pipeline(object):
     def last_telemetry(self):
         return self._serial_link.last_telemetry
 
+    @property
+    def detector(self):
+        """None until the worker thread finishes its cv2/camera setup, or if
+        that setup failed -- callers (e.g. the enrollment API) must treat
+        None as "recognition stack unavailable", not assume it's ready."""
+        return self._detector
+
+    @property
+    def embedder(self):
+        return self._embedder
+
     def _run(self):
         try:
             import cv2  # noqa: local import, see module docstring
@@ -173,35 +227,86 @@ class Pipeline(object):
             self._embedder = None
 
         while not self._stop_event.is_set():
-            frame = self._camera.read()
-            if frame is None:
-                time.sleep(0.05)
-                continue
+            self._run_once(cv2)
 
-            self._process_frame(cv2, frame)
+    def _run_once(self, cv2):
+        """One `_run()` loop iteration, split out so a single bad frame's
+        exception handling is unit-testable without a real camera/cv2
+        thread loop (see test_pipeline.py)."""
+        frame = self._camera.read()
+        try:
+            self._handle_frame(cv2, frame)
+        except Exception:
+            # A single bad frame (e.g. a transient detector/DNN error) must
+            # not kill this thread permanently -- `state` would then keep
+            # serving its last frame/event forever with no way to recover
+            # short of restarting the process. Log and keep pulling frames
+            # instead.
+            logger.exception("vision pipeline: error processing frame, skipping it")
+        if frame is None:
+            time.sleep(0.05)
+
+    def _handle_frame(self, cv2, frame):
+        """One iteration's worth of work, split out from `_run()` so it can
+        be unit-tested without a real camera/cv2 thread loop.
+        """
+        if frame is None:
+            # RF-16: notify exactly once per connected -> disconnected
+            # transition, not once per failed read attempt.
+            if self._camera_connected:
+                self._camera_connected = False
+                self._publish_camera_event(connected=False)
+            return
+
+        # Reconnect (if we were disconnected) is implicitly notified by the
+        # normal event this frame publishes below, which carries
+        # camera_connected=True.
+        self._camera_connected = True
+        self._process_frame(cv2, frame)
+
+    def _publish_camera_event(self, connected):
+        self.state.publish(
+            None,
+            {
+                "frame_width": None,
+                "frame_height": None,
+                "detections": [],
+                "telemetry": self._telemetry_dict(),
+                "serial_connected": self._serial_link.connected,
+                "tracking_enabled": self._tracking_enabled,
+                "camera_connected": connected,
+            },
+        )
+
+    def _telemetry_dict(self):
+        telemetry = self._serial_link.last_telemetry
+        if telemetry is None:
+            return None
+        return {
+            "ok": telemetry.ok,
+            "pan_deg": telemetry.pan_deg,
+            "tilt_deg": telemetry.tilt_deg,
+            "moving": telemetry.moving,
+            "homed": telemetry.homed,
+        }
 
     def _process_frame(self, cv2, frame):
         self._frame_count += 1
         height, width = frame.shape[:2]
         detections = self._detector.detect(frame)
+
+        recognition_due = (
+            self._embedder is not None
+            and self._frame_count % self._config.recognition.run_every_n_frames == 0
+        )
+        results = [
+            (detection, self._label_for(detection, frame, recognition_due))
+            for detection in detections
+        ]
+
+        # Tracking still follows a single target -- the largest face
+        # (detections are sorted largest-first by YuNetDetector.detect).
         target = detections[0] if detections else None
-
-        match = None
-        if target is not None and self._embedder is not None:
-            due = self._frame_count % self._config.recognition.run_every_n_frames == 0
-            if due:
-                try:
-                    embedding = self._embedder.embed_from_landmarks(frame, target.landmarks)
-                    match = self._repository.find_best_match(
-                        embedding, self._config.recognition.match_threshold
-                    )
-                except ValueError:
-                    match = None
-                self._label_cache.update_from_match(match)
-
-        label = self._label_cache.current() or UNKNOWN_LABEL if target is not None else None
-
-        telemetry = self._serial_link.last_telemetry
         if target is not None and self._tracking_enabled:
             cx, cy = target.center
             offset = PixelOffset(
@@ -214,52 +319,67 @@ class Pipeline(object):
             if delta is not None:
                 self._serial_link.send_move_delta(delta.pan_deg, delta.tilt_deg)
 
-        annotated = self._annotate(cv2, frame, target, label)
+        annotated = self._annotate(cv2, frame, results)
         ok, buf = cv2.imencode(".jpg", annotated)
         jpeg = buf.tobytes() if ok else None
 
         event = {
             "frame_width": width,
             "frame_height": height,
-            "detection": None
-            if target is None
-            else {
-                "bbox": list(target.bbox),
-                "score": target.score,
-                "label": label,
-            },
-            "telemetry": None
-            if telemetry is None
-            else {
-                "ok": telemetry.ok,
-                "pan_deg": telemetry.pan_deg,
-                "tilt_deg": telemetry.tilt_deg,
-                "moving": telemetry.moving,
-                "homed": telemetry.homed,
-            },
+            "detections": [
+                {
+                    "bbox": list(detection.bbox),
+                    "score": detection.score,
+                    "label": label or UNKNOWN_LABEL,
+                }
+                for detection, label in results
+            ],
+            "telemetry": self._telemetry_dict(),
             "serial_connected": self._serial_link.connected,
             "tracking_enabled": self._tracking_enabled,
+            "camera_connected": True,
         }
         self.state.publish(jpeg, event)
 
-    def _annotate(self, cv2, frame, target, label):
+    def _label_for(self, detection, frame, recognition_due):
+        """RF-11/RF-18: each detected face is matched independently against
+        every registered person; the highest-scoring match >= threshold
+        wins. Returns None for "no match" (displayed as Desconocido)."""
+        center = detection.center
+
+        if not recognition_due:
+            label, found = self._identity_memory.recall(center)
+            return label if found else None
+
+        try:
+            embedding = self._embedder.embed_from_landmarks(frame, detection.landmarks)
+            matches = self._repository.find_all_matches(
+                embedding, self._config.recognition.match_threshold
+            )
+        except ValueError:
+            matches = []
+
+        label = matches[0].name if matches else None
+        self._identity_memory.remember(center, label)
+        return label
+
+    def _annotate(self, cv2, frame, results):
         annotated = frame.copy()
         height, width = annotated.shape[:2]
         cv2.line(annotated, (width // 2, 0), (width // 2, height), (60, 60, 60), 1)
         cv2.line(annotated, (0, height // 2), (width, height // 2), (60, 60, 60), 1)
 
-        if target is not None:
-            x, y, w, h = [int(v) for v in target.bbox]
-            color = (0, 255, 0) if label and label != UNKNOWN_LABEL else (0, 165, 255)
+        for detection, label in results:
+            x, y, w, h = [int(v) for v in detection.bbox]
+            color = _KNOWN_COLOR if label else _UNKNOWN_COLOR
             cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-            if label:
-                cv2.putText(
-                    annotated,
-                    label,
-                    (x, max(0, y - 8)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    color,
-                    2,
-                )
+            cv2.putText(
+                annotated,
+                label or UNKNOWN_LABEL,
+                (x, max(0, y - 8)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                color,
+                2,
+            )
         return annotated
