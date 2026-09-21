@@ -14,8 +14,12 @@ bytes, so it stays testable with a fake detector/embedder and no cv2
 dependency — decoding happens once at the API boundary.
 """
 
+import logging
+
 from vision.config import RecognitionConfig
 from vision.recognition.similarity import cosine_similarity
+
+logger = logging.getLogger(__name__)
 
 POSE_ORDER = ("front", "left", "right")
 
@@ -110,10 +114,16 @@ class EnrollmentSession(object):
             raise SessionIncomplete("enrollment session needs 3 accepted photos")
 
         embeddings = [embedding for _, embedding, _ in self._captures]
+        poses = [pose for pose, _, _ in self._captures]
         threshold = self._config.enrollment_consistency_threshold
         for i in range(len(embeddings)):
             for j in range(i + 1, len(embeddings)):
-                if cosine_similarity(embeddings[i], embeddings[j]) < threshold:
+                sim = cosine_similarity(embeddings[i], embeddings[j])
+                logger.warning(
+                    "enrollment consistency check %s vs %s: cosine=%.4f (threshold=%.2f)",
+                    poses[i], poses[j], sim, threshold,
+                )
+                if sim < threshold:
                     self.cancel()
                     raise InconsistentPhotos(
                         "the 3 photos do not appear to be the same person"

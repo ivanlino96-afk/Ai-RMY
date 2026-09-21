@@ -26,12 +26,16 @@ class DetectionConfig(NamedTuple):
 class RecognitionConfig(NamedTuple):
     model_path: str = "vision/models/w600k_mbf.onnx"
     input_size: int = 112
-    # Cosine similarity >= this counts as a match. Conservative on purpose:
-    # prefer "Unknown" over a false positive (see AGENTS.md and RNF-2).
-    match_threshold: float = 0.90
+    # Cosine similarity >= this counts as a match. Empirically calibrated for
+    # the w600k_mbf (MobileFaceNet) model: genuine same-person cross-pose
+    # similarity from real captures lands around 0.5-0.7, not 0.9+, so 0.90
+    # made every match (and every enrollment, see below) unreachable.
+    match_threshold: float = 0.45
     # Minimum cross-photo cosine similarity required between the 3 enrollment
-    # photos for the enrollment to be accepted (RF-5).
-    enrollment_consistency_threshold: float = 0.90
+    # photos for the enrollment to be accepted (RF-5). Shared with
+    # match_threshold by design (see specs/plan.md) to avoid an unjustified
+    # second metric.
+    enrollment_consistency_threshold: float = 0.45
     # Recognition is far more expensive than detection, so it only runs
     # every Nth frame on the currently tracked face crop.
     run_every_n_frames: int = 5

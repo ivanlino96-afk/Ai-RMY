@@ -34,9 +34,6 @@ logger = logging.getLogger(__name__)
 # label the frontend renders verbatim, not an internal identifier.
 UNKNOWN_LABEL = "Desconocido"
 
-_KNOWN_COLOR = (0, 255, 0)  # BGR green -- recognized match, RF-12
-_UNKNOWN_COLOR = (0, 0, 255)  # BGR red -- no match >= threshold, RF-13
-
 
 def _center_distance(a, b):
     return ((a[0] - b[0]) ** 2 + (a[1] - b[1]) ** 2) ** 0.5
@@ -307,7 +304,8 @@ class Pipeline(object):
         # Tracking still follows a single target -- the largest face
         # (detections are sorted largest-first by YuNetDetector.detect).
         target = detections[0] if detections else None
-        if target is not None and self._tracking_enabled:
+        tracking_offset = None
+        if target is not None:
             cx, cy = target.center
             offset = PixelOffset(
                 dx=cx - width / 2.0,
@@ -316,10 +314,19 @@ class Pipeline(object):
                 frame_height=height,
             )
             delta = self._tracking_controller.compute(offset)
-            if delta is not None:
+            tracking_offset = {
+                "dx": offset.dx,
+                "dy": offset.dy,
+                "pan_deg": delta.pan_deg if delta is not None else 0.0,
+                "tilt_deg": delta.tilt_deg if delta is not None else 0.0,
+                "centered": delta is None,
+            }
+            # The UI shows this offset/correction regardless of whether
+            # tracking is paused, but the ESP32 only moves while enabled.
+            if delta is not None and self._tracking_enabled:
                 self._serial_link.send_move_delta(delta.pan_deg, delta.tilt_deg)
 
-        annotated = self._annotate(cv2, frame, results)
+        annotated = self._annotate(cv2, frame)
         ok, buf = cv2.imencode(".jpg", annotated)
         jpeg = buf.tobytes() if ok else None
 
@@ -338,6 +345,7 @@ class Pipeline(object):
             "serial_connected": self._serial_link.connected,
             "tracking_enabled": self._tracking_enabled,
             "camera_connected": True,
+            "tracking_offset": tracking_offset,
         }
         self.state.publish(jpeg, event)
 
@@ -363,23 +371,13 @@ class Pipeline(object):
         self._identity_memory.remember(center, label)
         return label
 
-    def _annotate(self, cv2, frame, results):
+    def _annotate(self, cv2, frame):
+        # RF-12/RF-13 (box + label per face) is rendered once, client-side, by
+        # DetectionOverlay -- it has the match score to show, this layer
+        # doesn't. Drawing it here too used to double up every face with a
+        # second, unlabelled box baked into the MJPEG stream.
         annotated = frame.copy()
         height, width = annotated.shape[:2]
         cv2.line(annotated, (width // 2, 0), (width // 2, height), (60, 60, 60), 1)
         cv2.line(annotated, (0, height // 2), (width, height // 2), (60, 60, 60), 1)
-
-        for detection, label in results:
-            x, y, w, h = [int(v) for v in detection.bbox]
-            color = _KNOWN_COLOR if label else _UNKNOWN_COLOR
-            cv2.rectangle(annotated, (x, y), (x + w, y + h), color, 2)
-            cv2.putText(
-                annotated,
-                label or UNKNOWN_LABEL,
-                (x, max(0, y - 8)),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.6,
-                color,
-                2,
-            )
         return annotated

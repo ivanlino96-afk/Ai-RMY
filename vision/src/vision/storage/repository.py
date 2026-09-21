@@ -24,9 +24,9 @@ _SCHEMA = """
 CREATE TABLE IF NOT EXISTS people (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    age INTEGER NOT NULL,
-    email TEXT NOT NULL,
-    phone TEXT NOT NULL,
+    age INTEGER,
+    email TEXT NOT NULL DEFAULT '',
+    phone TEXT NOT NULL DEFAULT '',
     notes TEXT NOT NULL DEFAULT '',
     created_at REAL NOT NULL
 );
@@ -121,13 +121,17 @@ class FaceRepository(object):
         matches an already-registered (non-deleted) person. Deletion in
         this repository is a hard delete, so "non-deleted" is simply
         "still present in the table" — no soft-delete bookkeeping needed.
+
+        Phone is optional (enrollment only requires a name); an empty
+        phone never counts as a match, otherwise every name-only signup
+        would collide with every other one.
         """
         normalized_name = name.strip().lower()
         rows = self._conn.execute("SELECT name, phone FROM people").fetchall()
         for existing_name, existing_phone in rows:
             if existing_name.strip().lower() == normalized_name:
                 return True
-            if existing_phone == phone:
+            if phone and existing_phone == phone:
                 return True
         return False
 

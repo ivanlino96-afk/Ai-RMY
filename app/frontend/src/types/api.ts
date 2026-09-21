@@ -3,7 +3,7 @@
 export interface Person {
   id: number
   name: string
-  age: number
+  age: number | null
   email: string
   phone: string
   notes: string
@@ -12,9 +12,9 @@ export interface Person {
 
 export interface PersonInput {
   name: string
-  age: number
-  email: string
-  phone: string
+  age?: number | null
+  email?: string
+  phone?: string
   notes?: string
 }
 
@@ -32,6 +32,14 @@ export interface Telemetry {
   homed: boolean
 }
 
+export interface TrackingOffset {
+  dx: number
+  dy: number
+  pan_deg: number
+  tilt_deg: number
+  centered: boolean
+}
+
 export interface DetectionEvent {
   frame_width: number | null
   frame_height: number | null
@@ -40,6 +48,7 @@ export interface DetectionEvent {
   serial_connected: boolean
   tracking_enabled: boolean
   camera_connected: boolean
+  tracking_offset: TrackingOffset | null
 }
 
 export interface GimbalStatus {

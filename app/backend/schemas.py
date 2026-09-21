@@ -26,13 +26,13 @@ def _validate_phone(value):
 
 class PersonIn(BaseModel):
     name: str
-    age: int
-    email: str
-    phone: str
+    age: Optional[int] = None
+    email: str = ""
+    phone: str = ""
     notes: str = ""
 
-    _validate_email = field_validator("email")(_validate_email)
-    _validate_phone = field_validator("phone")(_validate_phone)
+    _validate_email = field_validator("email")(lambda v: _validate_email(v) if v else v)
+    _validate_phone = field_validator("phone")(lambda v: _validate_phone(v) if v else v)
 
 
 class PersonUpdate(BaseModel):
@@ -53,7 +53,7 @@ class PersonUpdate(BaseModel):
 class PersonOut(BaseModel):
     id: int
     name: str
-    age: int
+    age: Optional[int] = None
     email: str
     phone: str
     notes: str
@@ -74,6 +74,14 @@ class TelemetryOut(BaseModel):
     homed: bool
 
 
+class TrackingOffsetOut(BaseModel):
+    dx: float
+    dy: float
+    pan_deg: float
+    tilt_deg: float
+    centered: bool
+
+
 class EventOut(BaseModel):
     frame_width: Optional[int] = None
     frame_height: Optional[int] = None
@@ -82,6 +90,7 @@ class EventOut(BaseModel):
     serial_connected: bool
     tracking_enabled: bool
     camera_connected: bool = True
+    tracking_offset: Optional[TrackingOffsetOut] = None
 
 
 class GimbalStatusOut(BaseModel):

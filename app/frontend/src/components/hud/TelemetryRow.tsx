@@ -5,12 +5,13 @@ interface TelemetryRowProps {
   valueDeg: number
   min?: number
   max?: number
+  unit?: string
 }
 
 // A graduated tape gauge, like a pan/tilt readout on a real camera mount —
 // the tick marks and marker encode range/position, the number is the
 // precise value. Ticks are load-bearing, not decoration.
-export function TelemetryRow({ label, valueDeg, min = -90, max = 90 }: TelemetryRowProps) {
+export function TelemetryRow({ label, valueDeg, min = -90, max = 90, unit = '°' }: TelemetryRowProps) {
   const clamped = Math.min(max, Math.max(min, valueDeg))
   const fraction = (clamped - min) / (max - min)
 
@@ -25,7 +26,7 @@ export function TelemetryRow({ label, valueDeg, min = -90, max = 90 }: Telemetry
         />
       </div>
       <span className="tabular w-14 shrink-0 text-right text-sm text-ink">
-        {valueDeg.toFixed(1)}°
+        {valueDeg.toFixed(1)}{unit}
       </span>
     </div>
   )

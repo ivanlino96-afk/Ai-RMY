@@ -44,9 +44,6 @@ export function EnrollmentFlow({ person, onClose, onComplete }: EnrollmentFlowPr
   const startedRef = useRef(false)
 
   const [name, setName] = useState(person?.name ?? '')
-  const [age, setAge] = useState(person ? String(person.age) : '')
-  const [email, setEmail] = useState(person?.email ?? '')
-  const [phone, setPhone] = useState(person?.phone ?? '')
   const [notes, setNotes] = useState(person?.notes ?? '')
 
   useEffect(() => {
@@ -109,7 +106,7 @@ export function EnrollmentFlow({ person, onClose, onComplete }: EnrollmentFlowPr
 
   const submitForm = () => {
     if (!sessionId) return
-    finalize(sessionId, { name, age: Number(age), email, phone, notes })
+    finalize(sessionId, { name, notes })
   }
 
   const title = person ? 'Retake photos' : 'Enroll face'
@@ -147,26 +144,6 @@ export function EnrollmentFlow({ person, onClose, onComplete }: EnrollmentFlowPr
         ) : (
           <div className="space-y-2">
             <input value={name} onChange={(e) => setName(e.target.value)} placeholder="Name" className={inputClass} />
-            <input
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder="Age"
-              type="number"
-              className={inputClass}
-            />
-            <input
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Email"
-              type="email"
-              className={inputClass}
-            />
-            <input
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="Phone"
-              className={inputClass}
-            />
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
@@ -181,7 +158,7 @@ export function EnrollmentFlow({ person, onClose, onComplete }: EnrollmentFlowPr
               <button
                 type="button"
                 onClick={submitForm}
-                disabled={!name || !age || !email || !phone || finalizeEnrollment.isPending}
+                disabled={!name || finalizeEnrollment.isPending}
                 className="flex-1 border border-hairline px-3 py-2 text-xs uppercase tracking-[0.1em] text-lock hover:border-lock disabled:opacity-40"
               >
                 {finalizeEnrollment.isPending ? 'Saving…' : 'Save'}

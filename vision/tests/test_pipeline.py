@@ -5,6 +5,7 @@ from vision.config import PipelineConfig
 from vision.detection.yunet import Detection
 from vision.pipeline import UNKNOWN_LABEL, Pipeline, SharedState, _IdentityMemory
 from vision.storage.repository import FaceRepository
+from vision.tracking.controller import PixelOffset, TrackingController
 
 _LANDMARKS = ((0.0, 0.0), (10.0, 0.0), (5.0, 5.0), (0.0, 10.0), (10.0, 10.0))
 
@@ -82,6 +83,53 @@ def test_process_frame_reports_all_unmatched_faces_as_desconocido(tmp_path):
     assert all(d["label"] == UNKNOWN_LABEL for d in event["detections"])
 
 
+# -- tracking_offset: same numbers the event carries as go to the motors ----
+
+
+def test_event_tracking_offset_matches_controller_for_off_center_face(tmp_path):
+    detection = _detection(x=0, y=0, w=20, h=20)  # center (10, 10) on a 100x100 frame
+    pipeline = _pipeline(tmp_path, detections=[detection])
+
+    pipeline._process_frame(FakeCv2(), _frame())
+
+    event = pipeline.state.latest_event()
+    offset = PixelOffset(dx=-40.0, dy=-40.0, frame_width=100, frame_height=100)
+    expected = TrackingController().compute(offset)
+
+    assert event["tracking_offset"] == {
+        "dx": offset.dx,
+        "dy": offset.dy,
+        "pan_deg": expected.pan_deg,
+        "tilt_deg": expected.tilt_deg,
+        "centered": False,
+    }
+
+
+def test_event_tracking_offset_reports_centered_within_deadband(tmp_path):
+    detection = _detection(x=40, y=40, w=20, h=20)  # center (50, 50): frame's exact center
+    pipeline = _pipeline(tmp_path, detections=[detection])
+
+    pipeline._process_frame(FakeCv2(), _frame())
+
+    event = pipeline.state.latest_event()
+    assert event["tracking_offset"] == {
+        "dx": 0.0,
+        "dy": 0.0,
+        "pan_deg": 0.0,
+        "tilt_deg": 0.0,
+        "centered": True,
+    }
+
+
+def test_event_tracking_offset_is_none_without_a_target(tmp_path):
+    pipeline = _pipeline(tmp_path, detections=[])
+
+    pipeline._process_frame(FakeCv2(), _frame())
+
+    event = pipeline.state.latest_event()
+    assert event["tracking_offset"] is None
+
+
 # -- T10: identity memory keeps identity within window, forgets past it -----
 
 
@@ -107,26 +155,20 @@ def test_identity_memory_forgets_identity_past_window_seconds():
     assert label is None
 
 
-# -- T11: annotation draws green+name vs red+Desconocido per face -----------
+# -- T11: annotation draws the shared centre reticle, nothing per-face ------
+# (RF-12/RF-13's green/red box + label is rendered once, client-side, by
+# DetectionOverlay -- this layer only encodes the raw frame for the MJPEG
+# stream, so it must not draw its own per-face box/text on top of it.)
 
 
-def test_annotate_draws_green_for_recognized_and_red_for_unrecognized(tmp_path):
+def test_annotate_draws_no_per_face_box_or_label(tmp_path):
     pipeline = _pipeline(tmp_path)
     cv2 = FakeCv2()
-    results = [
-        (_detection(x=0), "Ada"),
-        (_detection(x=50), None),
-    ]
 
-    pipeline._annotate(cv2, _frame(), results)
+    pipeline._annotate(cv2, _frame())
 
-    assert cv2.rectangles[0]["color"] == (0, 255, 0)
-    assert cv2.texts[0]["text"] == "Ada"
-    assert cv2.texts[0]["color"] == (0, 255, 0)
-
-    assert cv2.rectangles[1]["color"] == (0, 0, 255)
-    assert cv2.texts[1]["text"] == UNKNOWN_LABEL
-    assert cv2.texts[1]["color"] == (0, 0, 255)
+    assert cv2.rectangles == []
+    assert cv2.texts == []
 
 
 # -- T12: camera connect/disconnect publishes once per transition -----------

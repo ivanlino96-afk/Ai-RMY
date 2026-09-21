@@ -2,6 +2,7 @@ import { useGimbalStatus } from '../api/gimbal'
 import { CornerBracketPanel } from '../components/hud/CornerBracketPanel'
 import { GimbalStatusPanel } from '../components/status/GimbalStatusPanel'
 import { TrackedPersonPanel } from '../components/status/TrackedPersonPanel'
+import { TrackingOffsetPanel } from '../components/status/TrackingOffsetPanel'
 import { LiveVideoView } from '../components/video/LiveVideoView'
 import type { useDetectionSocket } from '../hooks/useDetectionSocket'
 
@@ -27,6 +28,11 @@ export function LiveViewPage({ detection }: LiveViewPageProps) {
 
       <div className="space-y-6">
         <TrackedPersonPanel detections={detections} />
+        <TrackingOffsetPanel
+          offset={detection.event?.tracking_offset ?? null}
+          frameWidth={detection.event?.frame_width ?? null}
+          frameHeight={detection.event?.frame_height ?? null}
+        />
         <GimbalStatusPanel status={status} />
       </div>
     </div>

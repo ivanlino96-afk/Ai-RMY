@@ -20,7 +20,7 @@ export function PersonCard({ person }: PersonCardProps) {
   const [photoVersion, setPhotoVersion] = useState(0)
 
   const [name, setName] = useState(person.name)
-  const [age, setAge] = useState(String(person.age))
+  const [age, setAge] = useState(person.age != null ? String(person.age) : '')
   const [email, setEmail] = useState(person.email)
   const [phone, setPhone] = useState(person.phone)
   const [notes, setNotes] = useState(person.notes)
