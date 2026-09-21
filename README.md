@@ -41,3 +41,4 @@ completando en paralelo al desarrollo.
 
 Proyecto en fase de scaffolding inicial — ver el plan de arquitectura para el
 detalle de MVP vs. fases futuras.
+# Ai-RMY
