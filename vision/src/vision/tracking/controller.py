@@ -46,7 +46,7 @@ class TrackingController(object):
         """Compute a pan/tilt correction for one detection offset.
 
         Returns None if the offset is within the deadband (no correction
-        needed) — callers should send nothing to the ESP32 in that case
+        needed) — callers should send nothing to the Arduino Uno in that case
         rather than a zero-delta command.
         """
         half_w = offset.frame_width / 2.0

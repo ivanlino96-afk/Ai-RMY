@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { useEffect, useRef } from 'react'
 import { useDetectionSocket } from '../../hooks/useDetectionSocket'
+import { lastCameraIndex } from '../../hooks/useCameraOwner'
 import { useNotifications } from '../../hooks/useNotifications'
 import { TopBar } from './TopBar'
 
@@ -27,13 +28,21 @@ export function AppShell({ children }: AppShellProps) {
     lastCameraConnected.current = current
   }, [detection.event?.camera_connected, notify])
 
+  useEffect(() => {
+    if (detection.event?.camera_index != null) {
+      lastCameraIndex.current = detection.event.camera_index
+    }
+  }, [detection.event?.camera_index])
+
   return (
-    <div className="min-h-screen bg-void">
+    <div className="flex h-screen flex-col bg-void">
       <TopBar
         serialConnected={detection.event?.serial_connected ?? false}
         socketConnected={detection.connected}
       />
-      <main className="mx-auto max-w-6xl px-6 py-6">{children(detection)}</main>
+      <main className="mx-auto w-full min-h-0 max-w-[1600px] flex-1 overflow-y-auto px-6 py-4">
+        {children(detection)}
+      </main>
     </div>
   )
 }

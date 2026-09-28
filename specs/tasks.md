@@ -158,22 +158,22 @@
 
 ## Frontend (depende de T13–T18; presentación pura, sin lógica de protocolo/visión)
 
-- [ ] **T19. Flujo de captura guiada (encuadre en vivo + pasos + formulario)**
+- [X] **T19. Flujo de captura guiada (encuadre en vivo + pasos + formulario)**
   Componente que consume los endpoints de T14: muestra el encuadre recibido del backend, guía
-  las 3 poses en orden, y el formulario de nombre/edad/correo/teléfono.
+  las 3 poses en orden, y el formulario de nombre (edad/correo/teléfono quedaron opcionales).
   **RF cubiertos**: RF-1, RF-2, RF-3, RF-4, RF-5, RF-6, RF-17.
   **Hecho cuando:** probado manualmente en el navegador, el flujo completo de alta (3 fotos +
   datos) crea una persona visible en la lista; una foto rechazada por el backend muestra el
   mensaje de reintento sin avanzar de paso.
 
-- [ ] **T20. Overlay de múltiples recuadros en la vista en vivo**
+- [X] **T20. Overlay de múltiples recuadros en la vista en vivo**
   `DetectionOverlay` dibuja un recuadro por cada detección del evento (verde/nombre o rojo/
   "Desconocido"), sin recalcular ni decidir nada — solo renderiza el arreglo recibido.
   **RF cubiertos**: RF-11, RF-12, RF-13, RF-14, RF-15.
   **Hecho cuando:** probado manualmente con 2+ personas frente a la cámara (una registrada, una
   no), ambos recuadros aparecen simultáneamente con el color/etiqueta correctos.
 
-- [ ] **T21. Edición, borrado con confirmación, y notificaciones de duplicado/cámara**
+- [X] **T21. Edición, borrado con confirmación, y notificaciones de duplicado/cámara**
   UI de edición (datos vs. fotos, con opción de cancelar), diálogo de confirmación de borrado, y
   notificaciones para duplicado (T15) y conexión/desconexión de cámara (T12/T18).
   **RF cubiertos**: RF-7, RF-8, RF-9, RF-10, RF-16.
@@ -182,9 +182,10 @@
 
 ## Verificación final (depende de todas las anteriores)
 
-- [ ] **T22. Verificación end-to-end del criterio de finalización**
+- [X] **T22. Verificación end-to-end del criterio de finalización**
   Con el sistema completo corriendo, dar de alta a una persona nueva y confirmar que es
-  reconocida con ≥90% de certeza la primera vez que aparece frente a la cámara tras el alta.
+  reconocida la primera vez que aparece frente a la cámara tras el alta, con una similitud
+  ≥ `match_threshold` (0.45, recalibrado empíricamente para w600k_mbf — ver `vision/config.py`).
   **RF cubiertos**: RF-1 a RF-18 (criterio de finalización de `spec.md`).
   **Hecho cuando:** toda la suite de pruebas automatizadas de T1–T18 pasa en verde, y la
   verificación manual de T19–T21 se completó sin hallazgos pendientes.

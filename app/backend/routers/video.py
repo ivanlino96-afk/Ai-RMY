@@ -29,4 +29,9 @@ def stream_video(pipeline=Depends(get_pipeline)):
     return StreamingResponse(
         generate(),
         media_type="multipart/x-mixed-replace; boundary=%s" % _BOUNDARY,
+        # Without this, the browser can serve a cached copy of this response
+        # (i.e. a single frozen frame) to a new <img> element that remounts
+        # with the same src -- exactly what happens navigating away from and
+        # back to the live view. Every mount must open a fresh live stream.
+        headers={"Cache-Control": "no-store, no-cache, must-revalidate"},
     )

@@ -4,58 +4,72 @@
 
 Ai-RMY es un gimbal pan-tilt de seguimiento facial:
 
-- Controlador de movimiento: ESP32 (Arduino framework, PlatformIO).
-- Actuadores: 2 motores a pasos (pan, tilt) vía drivers TB660 (interfaz STEP/DIR).
+- Controlador de movimiento: Arduino Uno (ATmega328P, Arduino framework, PlatformIO).
+- Actuadores: 2 motores a pasos NEMA17 (pan, tilt) vía drivers TB6600 (interfaz STEP/DIR).
 - Visión: Jetson Nano corriendo detección facial (OpenCV YuNet) + reconocimiento
   (embedding ONNX + match coseno contra rostros guardados).
 - Cliente: dashboard web (React + Tailwind CSS), servido por el backend FastAPI que
   corre en la propia Jetson.
-- Comunicación motor: USB Serial (NDJSON) entre Jetson y ESP32. Ver `docs/protocol.md`
+- Comunicación motor: USB Serial (NDJSON) entre Jetson y Arduino Uno. Ver `docs/protocol.md`
   como única fuente de verdad del protocolo — firmware y vision deben implementarlo
   idéntico.
 - Alcance de red: solo LAN. Sin acceso remoto/cloud, sin autenticación en el MVP.
 
 El producto permite: seguimiento automático de un rostro (centrado del gimbal),
 gestión de rostros conocidos (alta/baja/edición con foto), vista de cámara en vivo
-con overlay de detección (bounding box + nombre o "Unknown"), y estado del gimbal en
-tiempo real.
+con overlay de detección (bounding box + nombre o "Unknown"), estado del gimbal en
+tiempo real, y modo defensa/alarma de amenaza (trata a los rostros no reconocidos
+como amenaza, dispara una alarma y guarda una foto tras 3s sin poder identificar al
+sospechoso).
 
 ## Mecánica de referencia
 
 - Ejes: `pan` (rotación horizontal), `tilt` (inclinación vertical).
-- Sin limit switches en el MVP: el "home" es la posición mecánica física al encender.
-  No asumir una posición absoluta calibrada — puede haber deriva en sesiones largas.
+- No se instalan limit switches (decisión de diseño, no solo del MVP): el "home"
+  (origen 0,0) es la posición mecánica física al encender, y puede re-marcarse en
+  cualquier momento con el comando `home` / botón "Home" de la UI, que fija la
+  posición física actual como nuevo origen sin mover motores. No asumir una
+  posición absoluta calibrada — es siempre un origen relativo elegido, nunca una
+  medición externa, y puede haber deriva en sesiones largas.
 - Ángulos y deltas de movimiento se expresan en grados (`float`) en el protocolo.
 - La correspondencia física driver↔motor↔eje debe quedar documentada en
   `docs/hardware-wiring.md` y no asumirse desde el orden de cableado.
 
 ## Reglas de seguridad obligatorias
 
-- El ESP32 es la autoridad final: toda orden recibida por serial debe validar
+- El Arduino Uno es la autoridad final: toda orden recibida por serial debe validar
   límites suaves de pan/tilt antes de mover los motores, sin depender de que la
   Jetson ya los haya validado.
-- Ante ausencia de un comando válido por ~500ms-1s (watchdog), mantener la posición
-  actual — nunca extrapolar movimiento sin confirmación reciente del host.
+- Ante ausencia de un comando válido por el timeout configurado (watchdog, ver
+  `docs/protocol.md`), mantener la posición actual — nunca extrapolar movimiento sin
+  confirmación reciente del host.
 - `stop` tiene la máxima prioridad y corta cualquier movimiento en curso de inmediato.
-- Los motores se alimentan desde una fuente externa propia (acorde al driver TB660),
-  con masa común al ESP32. Nunca alimentar los motores desde el riel 5V/USB del ESP32.
+- Los motores se alimentan desde una fuente externa propia (24V, acorde al driver TB6600),
+  con masa común al Arduino Uno. Nunca alimentar los motores desde el riel 5V/USB del Arduino.
 - No commitear nunca datos biométricos: fotos de rostros y `faces.db` viven en
   `vision/data/` (gitignored). Los modelos `.onnx` tampoco se commitean (se descargan
   vía `scripts/download_models.sh`).
-- No afirmar posición angular absoluta sin homing: sin limit switches, los ángulos
-  reportados son relativos al encendido, no una referencia calibrada.
+- No afirmar posición angular absoluta calibrada: sin limit switches, los ángulos
+  reportados son siempre relativos al origen (0,0) vigente — la posición al
+  encender, o la última posición marcada con `home` — nunca una medición externa
+  calibrada.
 
 ## Arquitectura de software
 
 ### Firmware (`firmware/`)
 
-- PlatformIO + Arduino framework, target ESP32.
+- PlatformIO + Arduino framework, target Arduino Uno (ATmega328P, `env:uno`).
 - `AccelStepper` para control de los 2 ejes; si aparece jitter con la carga de
   serial+watchdog, la ruta de mejora documentada es `FastAccelStepper` (no reescribir
   desde cero, migrar el wrapper en `lib/GimbalControl`).
 - `lib/SerialProtocol/` parsea y serializa NDJSON según `docs/protocol.md` — no
   duplicar la lógica del protocolo en `main.cpp`.
 - `lib/GimbalControl/` encapsula límites suaves, watchdog y homing manual.
+- Compatibilidad: el ATmega328P tiene 2KB SRAM / 32KB flash (bastante menos
+  que otros targets considerados antes) — el stack actual (`std::string` +
+  `ArduinoJson` `JsonDocument` + 2x `AccelStepper`) no está benchmarkeado en
+  memoria; validar en banco (`pio run -e uno`, uso de RAM/flash reportado por
+  el build) antes de asumir que entra sin ajustes. Ver `docs/hardware-wiring.md`.
 
 ### Vision (`vision/`)
 

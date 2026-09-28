@@ -90,7 +90,61 @@ class EventOut(BaseModel):
     serial_connected: bool
     tracking_enabled: bool
     camera_connected: bool = True
+    camera_index: Optional[int] = None
     tracking_offset: Optional[TrackingOffsetOut] = None
+    scan: Optional[ScanStatusOut] = None
+    defense: Optional[DefenseStatusOut] = None
+
+
+class CameraInfo(BaseModel):
+    index: int
+    width: int
+    height: int
+
+
+class CameraListOut(BaseModel):
+    cameras: List[CameraInfo] = []
+
+
+class CameraSelectIn(BaseModel):
+    device_index: Optional[int] = None
+
+
+class ScanConfigIn(BaseModel):
+    pan_range_deg: Optional[List[float]] = None
+    tilt_range_deg: Optional[List[float]] = None
+    step_deg: Optional[float] = None
+
+
+class ScanObjectOut(BaseModel):
+    bbox: List[float]
+    label: str
+    score: float
+
+
+class ScanWaypointOut(BaseModel):
+    pan_deg: float
+    tilt_deg: float
+    objects: List[ScanObjectOut] = []
+
+
+class ScanStatusOut(BaseModel):
+    state: str  # idle | running | done
+    progress: float = 0.0
+    results: List[ScanWaypointOut] = []
+
+
+class DefenseLogEntryOut(BaseModel):
+    type: str  # "identified" | "threat"
+    timestamp: float
+    name: Optional[str] = None
+    photo: Optional[str] = None
+
+
+class DefenseStatusOut(BaseModel):
+    active: bool
+    armed_at: Optional[float] = None
+    log: List[DefenseLogEntryOut] = []
 
 
 class GimbalStatusOut(BaseModel):
@@ -101,6 +155,11 @@ class GimbalStatusOut(BaseModel):
 
 class TrackingModeIn(BaseModel):
     enabled: bool
+
+
+class JogIn(BaseModel):
+    pan_deg: float = 0.0
+    tilt_deg: float = 0.0
 
 
 class HealthOut(BaseModel):

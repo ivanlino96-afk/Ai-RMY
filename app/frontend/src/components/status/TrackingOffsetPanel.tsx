@@ -9,7 +9,7 @@ interface TrackingOffsetPanelProps {
   frameHeight: number | null
 }
 
-// Same numbers vision/pipeline.py computes and sends to the ESP32 via
+// Same numbers vision/pipeline.py computes and sends to the Arduino Uno via
 // TrackingController.compute() — this panel only displays them, it does
 // not recompute the geometry independently.
 export function TrackingOffsetPanel({ offset, frameWidth, frameHeight }: TrackingOffsetPanelProps) {
@@ -17,17 +17,17 @@ export function TrackingOffsetPanel({ offset, frameWidth, frameHeight }: Trackin
   const maxDy = (frameHeight ?? 0) / 2
 
   return (
-    <CornerBracketPanel title="Centering" color={offset === null ? 'hairline' : offset.centered ? 'lock' : 'warn'}>
+    <CornerBracketPanel title="Centering" color={offset === null ? 'hairline' : offset.centered ? 'lock' : 'warn'} compact>
       {offset === null ? (
         <p className="text-sm text-ink-dim">No target acquired.</p>
       ) : (
-        <div className="space-y-3">
+        <div className="space-y-1.5">
           <TelemetryRow label="dX" valueDeg={offset.dx} min={-maxDx} max={maxDx} unit="px" />
           <TelemetryRow label="dY" valueDeg={offset.dy} min={-maxDy} max={maxDy} unit="px" />
           <TelemetryRow label="Pan" valueDeg={offset.pan_deg} />
           <TelemetryRow label="Tilt" valueDeg={offset.tilt_deg} />
 
-          <div className="pt-1">
+          <div className="pt-0.5">
             <StatusBadge status={offset.centered ? 'lock' : 'warn'} label={offset.centered ? 'centered' : 'correcting'} />
           </div>
         </div>

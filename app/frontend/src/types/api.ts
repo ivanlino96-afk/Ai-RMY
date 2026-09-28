@@ -40,6 +40,43 @@ export interface TrackingOffset {
   centered: boolean
 }
 
+export interface ScanObject {
+  bbox: [number, number, number, number]
+  label: string
+  score: number
+}
+
+export interface ScanWaypoint {
+  pan_deg: number
+  tilt_deg: number
+  objects: ScanObject[]
+}
+
+export interface ScanStatus {
+  state: 'idle' | 'running' | 'done'
+  progress: number
+  results: ScanWaypoint[]
+}
+
+export interface ScanConfigInput {
+  pan_range_deg?: [number, number]
+  tilt_range_deg?: [number, number]
+  step_deg?: number
+}
+
+export interface DefenseLogEntry {
+  type: 'identified' | 'threat'
+  timestamp: number
+  name: string | null
+  photo: string | null
+}
+
+export interface DefenseStatus {
+  active: boolean
+  armed_at: number | null
+  log: DefenseLogEntry[]
+}
+
 export interface DetectionEvent {
   frame_width: number | null
   frame_height: number | null
@@ -48,7 +85,20 @@ export interface DetectionEvent {
   serial_connected: boolean
   tracking_enabled: boolean
   camera_connected: boolean
+  camera_index: number | null
   tracking_offset: TrackingOffset | null
+  scan: ScanStatus | null
+  defense: DefenseStatus | null
+}
+
+export interface CameraInfo {
+  index: number
+  width: number
+  height: number
+}
+
+export interface CameraList {
+  cameras: CameraInfo[]
 }
 
 export interface GimbalStatus {

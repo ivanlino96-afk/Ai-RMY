@@ -18,6 +18,8 @@ void GimbalControl::begin() {
   tiltStepper_.setMaxSpeed(800);
   tiltStepper_.setAcceleration(400);
   lastCommandMs_ = millis();
+  // No limit switches: the position we power on at IS the origin.
+  homed_ = true;
 }
 
 void GimbalControl::update() {
@@ -49,6 +51,14 @@ void GimbalControl::stop() {
   tiltStepper_.stop();
   panStepper_.setCurrentPosition(panStepper_.currentPosition());
   tiltStepper_.setCurrentPosition(tiltStepper_.currentPosition());
+}
+
+void GimbalControl::home() {
+  panStepper_.stop();
+  tiltStepper_.stop();
+  panStepper_.setCurrentPosition(0);
+  tiltStepper_.setCurrentPosition(0);
+  homed_ = true;
 }
 
 void GimbalControl::noteCommandReceived() { lastCommandMs_ = millis(); }

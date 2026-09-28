@@ -7,7 +7,8 @@
 //
 // Deliberately Arduino-free (plain std::string, no Arduino.h) so it compiles
 // and is unit-testable on the host (`pio test -e native`), independent of the
-// ESP32 toolchain. main.cpp converts to/from Arduino String at the call site.
+// target microcontroller's toolchain. main.cpp converts to/from Arduino String
+// at the call site.
 static const int kProtocolVersion = 1;
 
 enum class CommandType { MoveDelta, Goto, Stop, Home, Ping, Unknown };

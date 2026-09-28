@@ -38,3 +38,28 @@ class Camera(object):
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.release()
+
+
+def list_available_cameras(max_index=8, cv2_module=None):
+    """Probes device indices [0, max_index) and returns the ones that open,
+    as [{"index", "width", "height"}, ...]. `cv2_module` lets tests inject a
+    fake without a real camera/OpenCV install (see module docstring)."""
+    cv2 = cv2_module
+    if cv2 is None:
+        import cv2  # noqa: local import, see module docstring
+
+    cameras = []
+    for index in range(max_index):
+        cap = cv2.VideoCapture(index)
+        try:
+            if cap.isOpened():
+                cameras.append(
+                    {
+                        "index": index,
+                        "width": int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)),
+                        "height": int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)),
+                    }
+                )
+        finally:
+            cap.release()
+    return cameras

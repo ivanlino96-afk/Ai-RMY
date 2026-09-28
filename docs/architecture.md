@@ -12,7 +12,7 @@ documento es la referencia detallada de diseño.
         [Jetson: controlador P/deadband]   [nombre/"Unknown" + confianza]
                     |                              |
                     v                              v
-        [move_delta por USB Serial] -> [ESP32: valida límites, mueve steppers]
+        [move_delta por USB Serial] -> [Arduino Uno: valida límites, mueve steppers]
                     |
                     v
         [frame anotado + evento] -> [FastAPI: MJPEG + WebSocket] -> [Dashboard React]
@@ -29,7 +29,7 @@ el plan de arquitectura original.
 3. Offset en píxeles vs. centro del frame → controlador P con deadband → delta
    pan/tilt.
 4. Delta enviado como `move_delta` (ver `docs/protocol.md`) por USB Serial.
-5. ESP32 valida límites suaves, mueve `AccelStepper`, responde telemetría.
+5. Arduino Uno valida límites suaves, mueve `AccelStepper`, responde telemetría.
 6. El siguiente frame refleja la nueva orientación (retroalimentación de visual
    servoing — no hay encoder, el frame siguiente es la confirmación).
 7. En paralelo, a cadencia reducida (cada 5-10 frames), el crop del rostro
@@ -37,6 +37,13 @@ el plan de arquitectura original.
 8. El frame anotado se codifica a JPEG y queda en estado compartido → MJPEG.
 9. El evento estructurado (bbox, nombre, confianza, telemetría) se empuja por
    WebSocket.
+10. Modo defensa (opcional, armado/desarmado desde el dashboard): mientras está
+    armado, cada rostro sin match del paso 2 se correlaciona por distancia de
+    centro entre frames (mismo criterio que el matcher de identidad); si un
+    mismo rostro sin identificar persiste 3s continuos, se dispara una alarma
+    (se guarda una foto y se añade una entrada al log en memoria). Mientras
+    está armado, el `target` de tracking del paso 3 prioriza el rostro sin
+    reconocer sobre uno reconocido presente en el mismo frame.
 
 ## Decisiones y alternativas descartadas
 

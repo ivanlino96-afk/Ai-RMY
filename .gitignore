@@ -28,5 +28,11 @@ app/frontend/.vite/
 # OS
 .DS_Store
 
+# Dev server logs
+*.log
+
+# pytest tmp dirs (pytest-created, not fixtures)
+**/.pytest_tmp/
+
 # Claude Code runtime state
 .claude/

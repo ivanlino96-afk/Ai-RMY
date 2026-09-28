@@ -7,6 +7,8 @@ get_repository/get_pipeline/get_enrollment_sessions directly, so nothing
 touches vision/data/ or requires cv2/onnxruntime.
 """
 
+import time
+
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
@@ -41,20 +43,105 @@ class FakeEmbedder(object):
         return self._vector
 
 
+class FakeState(object):
+    """Stands in for Pipeline.SharedState -- video.py only ever reads
+    latest_jpeg() from it."""
+
+    def __init__(self, jpeg=b"fake-jpeg-bytes"):
+        self._jpeg = jpeg
+
+    def latest_jpeg(self):
+        return self._jpeg
+
+
 class FakePipeline(object):
     def __init__(self, config, detector=None, embedder=None):
         self.detector = detector or FakeDetector()
         self.embedder = embedder or FakeEmbedder()
         self.config = config
+        self.state = FakeState()
         self.last_telemetry = None
         self.serial_connected = False
         self.tracking_enabled = True
+        self.last_jog = None
+        self.stopped = False
+        self.camera_index = None
+        self._camera_list = [
+            {"index": 0, "width": 640, "height": 480},
+            {"index": 1, "width": 1920, "height": 1080},
+        ]
+        self._scan_state = "idle"
+        self._scan_progress = 0.0
+        self._scan_results = []
+        self.scan_started_with = None
+        self.scan_cancelled = False
+        self._defense_active = False
+        self._defense_armed_at = None
+        self._defense_log = []
 
     def center(self):
         pass
 
     def set_tracking_enabled(self, enabled):
+        if enabled and self._scan_state == "running":
+            return False
+        if not enabled and self._defense_active:
+            return False
         self.tracking_enabled = enabled
+        return True
+
+    def jog(self, pan_deg=0.0, tilt_deg=0.0):
+        self.last_jog = (pan_deg, tilt_deg)
+        return not self.tracking_enabled
+
+    def emergency_stop(self):
+        self.stopped = True
+        self.cancel_scan()
+        self.stop_defense_mode()
+
+    def list_cameras(self):
+        return self._camera_list
+
+    def select_camera(self, device_index):
+        self.camera_index = device_index
+
+    def start_scan(self, pan_range_deg=None, tilt_range_deg=None, step_deg=None):
+        if self.tracking_enabled or self._scan_state == "running":
+            return False
+        self.scan_started_with = (pan_range_deg, tilt_range_deg, step_deg)
+        self._scan_state = "running"
+        self._scan_progress = 0.0
+        return True
+
+    def cancel_scan(self):
+        self.scan_cancelled = True
+        self._scan_state = "idle"
+        self._scan_progress = 0.0
+
+    def scan_status(self):
+        return {
+            "state": self._scan_state,
+            "progress": self._scan_progress,
+            "results": self._scan_results,
+        }
+
+    def start_defense_mode(self):
+        if self._defense_active or self._scan_state == "running":
+            return False
+        self._defense_active = True
+        self._defense_armed_at = time.time()
+        return True
+
+    def stop_defense_mode(self):
+        self._defense_active = False
+        self._defense_armed_at = None
+
+    def defense_status(self):
+        return {
+            "active": self._defense_active,
+            "armed_at": self._defense_armed_at,
+            "log": self._defense_log,
+        }
 
 
 @pytest.fixture

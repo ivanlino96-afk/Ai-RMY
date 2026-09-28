@@ -6,7 +6,14 @@ imported anywhere, including tests, without the heavy CV stack installed.
 Python 3.6 compatible: NamedTuple instead of dataclasses.
 """
 
-from typing import NamedTuple
+from typing import NamedTuple, Tuple
+
+# Mirrors firmware/src/main.cpp's kLimits -- the Arduino Uno remains the sole
+# enforcement authority (see AGENTS.md); this is only used to avoid starting
+# a scan whose configured range would silently truncate at the firmware
+# boundary.
+FIRMWARE_PAN_LIMITS_DEG = (-45.0, 45.0)
+FIRMWARE_TILT_LIMITS_DEG = (-30.0, 30.0)
 
 
 class CameraConfig(NamedTuple):
@@ -72,6 +79,62 @@ class SerialLinkConfig(NamedTuple):
 class StorageConfig(NamedTuple):
     db_path: str = "vision/data/faces.db"
     photos_dir: str = "vision/data/faces"
+    alarms_dir: str = "vision/data/alarms"
+
+
+class ObjectDetectionConfig(NamedTuple):
+    model_path: str = "vision/models/nanodet.onnx"
+    # Matches the official NanoDet-Plus demo's own defaults (opencv_zoo
+    # object_detection_nanodet demo.py, 2022nov export).
+    score_threshold: float = 0.35
+    nms_threshold: float = 0.6
+    input_size: Tuple[int, int] = (416, 416)
+
+
+class ScanConfig(NamedTuple):
+    # Angular sweep for the room-scan / angular object inventory feature
+    # (2D pan/tilt grid -- not a 3D/distance map, see specs/tasks.md).
+    pan_range_deg: Tuple[float, float] = (-45.0, 45.0)
+    tilt_range_deg: Tuple[float, float] = (-30.0, 30.0)
+    step_deg: float = 15.0
+    # Settle + detect time per waypoint, once the gimbal reports arrival.
+    dwell_s: float = 1.5
+    arrival_timeout_s: float = 5.0
+
+
+class DefenseModeConfig(NamedTuple):
+    # How long a single suspect must stay continuously unidentified before
+    # the threat alarm fires (one photo + one log entry per sighting).
+    threat_seconds: float = 3.0
+    # Same center-distance correlation criterion as _IdentityMemory, used
+    # here to tell "the same unrecognized face across frames" apart from a
+    # new sighting.
+    max_center_distance: float = 75.0
+    # How long a sighting can go unseen before it's dropped -- a face that
+    # reappears after this counts as a brand new sighting (re-arms the
+    # alarm).
+    sighting_timeout_s: float = 1.0
+    # Once a threat photo is taken near a given bbox position, suppress
+    # further photos there for this long -- even if the sighting itself
+    # times out and re-arms in between (head turns, brief occlusion, a
+    # missed detection frame). One photo per intrusion, not one per
+    # sighting-timeout gap, for as long as the suspect keeps reappearing in
+    # roughly the same spot.
+    alarm_photo_cooldown_s: float = 600.0
+    log_max_events: int = 100
+
+
+def validate_scan_config(scan_config):
+    """Clamps pan/tilt_range_deg to the firmware's soft limits. UX-only --
+    the Arduino Uno re-validates every goto regardless (see AGENTS.md)."""
+    pan_lo, pan_hi = scan_config.pan_range_deg
+    tilt_lo, tilt_hi = scan_config.tilt_range_deg
+    fw_pan_lo, fw_pan_hi = FIRMWARE_PAN_LIMITS_DEG
+    fw_tilt_lo, fw_tilt_hi = FIRMWARE_TILT_LIMITS_DEG
+    return scan_config._replace(
+        pan_range_deg=(max(pan_lo, fw_pan_lo), min(pan_hi, fw_pan_hi)),
+        tilt_range_deg=(max(tilt_lo, fw_tilt_lo), min(tilt_hi, fw_tilt_hi)),
+    )
 
 
 class PipelineConfig(NamedTuple):
@@ -81,6 +144,9 @@ class PipelineConfig(NamedTuple):
     tracking: TrackingConfig = TrackingConfig()
     serial_link: SerialLinkConfig = SerialLinkConfig()
     storage: StorageConfig = StorageConfig()
+    object_detection: ObjectDetectionConfig = ObjectDetectionConfig()
+    scan: ScanConfig = ScanConfig()
+    defense: DefenseModeConfig = DefenseModeConfig()
     # Reduced-rate JPEG stream for the MJPEG endpoint (viewers don't need
     # full capture FPS).
     stream_fps: int = 12

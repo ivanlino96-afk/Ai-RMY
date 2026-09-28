@@ -14,7 +14,7 @@ const NAV_LINK_CLASS = ({ isActive }: { isActive: boolean }) =>
 
 export function TopBar({ serialConnected, socketConnected }: TopBarProps) {
   return (
-    <header className="border-b border-hairline bg-panel px-6">
+    <header className="shrink-0 border-b border-hairline bg-panel px-6">
       <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-8">
           <span className="text-sm tracking-[0.14em] text-ink">AI-RMY</span>
@@ -24,6 +24,12 @@ export function TopBar({ serialConnected, socketConnected }: TopBarProps) {
             </NavLink>
             <NavLink to="/people" className={NAV_LINK_CLASS}>
               Known faces
+            </NavLink>
+            <NavLink to="/manual" className={NAV_LINK_CLASS}>
+              Manual mode
+            </NavLink>
+            <NavLink to="/scan" className={NAV_LINK_CLASS}>
+              Room scan
             </NavLink>
           </nav>
         </div>

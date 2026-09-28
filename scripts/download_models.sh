@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Downloads the two ONNX models the vision pipeline needs at runtime.
+# Downloads the ONNX models the vision pipeline needs at runtime.
 # Never commit these (see .gitignore) — this script is how every
 # environment (dev machine or Jetson) gets them.
 #
 #   vision/models/yunet.onnx      - face detection (OpenCV Zoo YuNet)
 #   vision/models/w600k_mbf.onnx  - face recognition embeddings (InsightFace)
+#   vision/models/nanodet.onnx    - object detection for room scan (NanoDet-Plus)
 
 set -euo pipefail
 
@@ -64,6 +65,16 @@ else
     echo "NOTE: buffalo_sc wasn't available, used '$PACK' instead — heavier model," >&2
     echo "fine for dev-machine testing but revisit for the Jetson Nano deployment." >&2
   fi
+fi
+
+NANODET_URL="https://github.com/opencv/opencv_zoo/raw/main/models/object_detection_nanodet/object_detection_nanodet_2022nov.onnx"
+NANODET_DEST="$MODELS_DIR/nanodet.onnx"
+if [ -f "$NANODET_DEST" ]; then
+  echo "nanodet.onnx already present, skipping"
+else
+  echo "downloading NanoDet-Plus object detector from opencv_zoo..."
+  curl -fL --retry 3 -o "$NANODET_DEST" "$NANODET_URL"
+  echo "-> $NANODET_DEST"
 fi
 
 echo "done."

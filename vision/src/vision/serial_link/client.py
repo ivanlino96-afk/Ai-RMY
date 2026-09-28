@@ -1,8 +1,8 @@
-"""pyserial client talking to the ESP32 gimbal controller.
+"""pyserial client talking to the Arduino Uno gimbal controller.
 
 Handles the two realities of a USB-serial link to a microcontroller that
 this module owns end to end:
-  - the device node can disappear (unplug, ESP32 reset, Jetson reboot) and
+  - the device node can disappear (unplug, Arduino reset, Jetson reboot) and
     must be reconnected with backoff instead of raising forever.
   - reads/writes happen from a dedicated background thread so the caller
     (the tracking loop) never blocks on serial I/O.

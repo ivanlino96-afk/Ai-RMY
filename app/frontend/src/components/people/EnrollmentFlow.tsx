@@ -9,6 +9,7 @@ import { ApiError } from '../../api/client'
 import { CornerBracketPanel } from '../hud/CornerBracketPanel'
 import { CaptureFrame } from './CaptureFrame'
 import { POSE_ORDER, POSE_LABELS } from '../../constants'
+import { useCameraOwner } from '../../hooks/useCameraOwner'
 import type { Person, PersonInput, Pose } from '../../types/api'
 
 interface EnrollmentFlowProps {
@@ -31,6 +32,7 @@ function errorMessage(error: unknown): string {
 // vision.enroll.EnrollmentSession serves both, differing only in whether
 // `person` is set (see app/backend/routers/people.py's finalize branch).
 export function EnrollmentFlow({ person, onClose, onComplete }: EnrollmentFlowProps) {
+  useCameraOwner()
   const startEnrollment = useStartEnrollment()
   const submitPhoto = useSubmitEnrollmentPhoto()
   const cancelEnrollment = useCancelEnrollment()

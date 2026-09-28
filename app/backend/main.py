@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.backend.routers import events, gimbal, people, video
+from app.backend.routers import camera, defense, events, gimbal, people, scan, video
 from app.backend.schemas import HealthOut
 from vision import __version__ as vision_version
 from vision.config import PipelineConfig
@@ -38,6 +38,9 @@ app.include_router(video.router)
 app.include_router(events.router)
 app.include_router(people.router)
 app.include_router(gimbal.router)
+app.include_router(camera.router)
+app.include_router(scan.router)
+app.include_router(defense.router)
 
 
 @app.get("/api/health", response_model=HealthOut)

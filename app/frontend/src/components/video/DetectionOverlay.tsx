@@ -23,6 +23,8 @@ export function DetectionOverlay({ event }: DetectionOverlayProps) {
       {frameWidth && frameHeight
         ? detections.map((detection, index) => {
             const locked = detection.label !== null && detection.label !== UNKNOWN_LABEL
+            const centerX = Math.round(detection.bbox[0] + detection.bbox[2] / 2)
+            const centerY = Math.round(detection.bbox[1] + detection.bbox[3] / 2)
             return (
               <div
                 key={index}
@@ -36,6 +38,19 @@ export function DetectionOverlay({ event }: DetectionOverlayProps) {
                 >
                   {(detection.label ?? UNKNOWN_LABEL).toUpperCase()} ({Math.round(detection.score * 100)}%)
                 </span>
+
+                {/* Coordinate readout of the detection's bbox center, in raw
+                    frame pixels -- not a distance/depth reading (see
+                    CenteringReticle for the deadband/Δpx readout). */}
+                <div
+                  className={`absolute -top-6 left-full ml-2 min-w-19 whitespace-nowrap border bg-void/85 px-2 py-1 ${
+                    locked ? 'border-lock' : 'border-alert'
+                  }`}
+                >
+                  <div className="field-label mb-0.5">Target</div>
+                  <div className={`tabular text-xs ${locked ? 'text-lock' : 'text-alert'}`}>X {centerX}</div>
+                  <div className={`tabular text-xs ${locked ? 'text-lock' : 'text-alert'}`}>Y {centerY}</div>
+                </div>
               </div>
             )
           })

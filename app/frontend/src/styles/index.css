@@ -49,4 +49,18 @@
   .animate-lock-pulse {
     animation: lock-pulse 1.4s ease-in-out infinite;
   }
+
+  @keyframes radar-sweep {
+    from {
+      transform: rotate(0deg);
+    }
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .animate-radar-sweep {
+    animation: radar-sweep 4s linear infinite;
+    transform-origin: center;
+  }
 }

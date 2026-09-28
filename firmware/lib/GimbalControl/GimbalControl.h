@@ -39,6 +39,12 @@ class GimbalControl {
   // Highest priority: cancels any in-progress motion immediately.
   void stop();
 
+  // No limit switches: this re-defines the current physical position as the
+  // new (0,0) origin. Does not move any motor. Called at boot (the power-on
+  // position is the origin by definition) and on demand via the `home`
+  // command / UI button, e.g. after a manual repositioning.
+  void home();
+
   // Resets the watchdog timer. Call whenever a valid command is parsed,
   // even a `ping`.
   void noteCommandReceived();
@@ -49,7 +55,11 @@ class GimbalControl {
   float currentPanDeg();
   float currentTiltDeg();
   bool isMoving();
-  bool homed() const { return false; }  // reserved: no limit switches in MVP
+  // True once an origin has been established. Set in begin() (the power-on
+  // position counts as home) and stays true across explicit home() calls --
+  // this is a relative, user-chosen reference, never an absolute calibrated
+  // position (no limit switches).
+  bool homed() const { return homed_; }
 
  private:
   AccelStepper panStepper_;
@@ -58,6 +68,7 @@ class GimbalControl {
   float stepsPerDegree_;
   unsigned long watchdogTimeoutMs_;
   unsigned long lastCommandMs_ = 0;
+  bool homed_ = false;
 
   long degToSteps(float deg) const;
   float stepsToDeg(long steps) const;

@@ -5,15 +5,16 @@
 #include "GimbalControl.h"
 #include "SerialProtocol.h"
 
-// TODO(hardware-wiring.md): placeholder pins — update once the ESP32 board
-// and driver wiring are finalized. Do not wire real motors against these
-// without checking docs/hardware-wiring.md first.
-static const uint8_t kPanStepPin = 25;
-static const uint8_t kPanDirPin = 26;
-static const uint8_t kTiltStepPin = 27;
-static const uint8_t kTiltDirPin = 14;
+// Arduino Uno (ATmega328P), per docs/hardware-wiring.md. D0/D1 are reserved
+// for the hardware UART (USB Serial link to the Jetson) and D13 is tied to
+// the onboard LED/SPI SCK (avoided to prevent a boot-time glitch) — neither
+// is used for STEP/DIR/ENABLE.
+static const uint8_t kPanStepPin = 2;
+static const uint8_t kPanDirPin = 3;
+static const uint8_t kTiltStepPin = 4;
+static const uint8_t kTiltDirPin = 5;
 
-// TODO(hardware-wiring.md): depends on TB660 microstepping DIP switches and
+// TODO(hardware-wiring.md): depends on TB6600 microstepping DIP switches and
 // motor step angle. Placeholder assumes 200 full steps/rev * 1/8 microstepping
 // = 1600 steps/rev -> 1600/360 steps per degree.
 static const float kStepsPerDegree = 1600.0f / 360.0f;
@@ -24,8 +25,11 @@ static const GimbalLimits kLimits = {-45.0f, 45.0f, -30.0f, 30.0f};
 
 static const unsigned long kTelemetryIntervalMs = 100;  // ~10 Hz
 
+// Watchdog above SerialLink's ping_interval_s (2.0s, see
+// vision/src/vision/config.py) so the periodic keep-alive ping actually
+// prevents a false trip during normal idle gaps or a single long manual jog.
 GimbalControl gimbal(kPanStepPin, kPanDirPin, kTiltStepPin, kTiltDirPin,
-                     kLimits, kStepsPerDegree);
+                     kLimits, kStepsPerDegree, /*watchdogTimeoutMs=*/3000);
 
 unsigned long lastTelemetryMs = 0;
 std::string serialBuffer;
@@ -61,8 +65,10 @@ void handleLine(const std::string &line) {
       sendTelemetry(true, cmd.seq);
       break;
     case CommandType::Home:
-      // Reserved: no limit switches in the MVP. Ack without acting.
-      sendTelemetry(true, cmd.seq, "home_not_implemented");
+      // No limit switches: re-defines the current physical position as the
+      // new (0,0) origin. Does not move any motor.
+      gimbal.home();
+      sendTelemetry(true, cmd.seq);
       break;
     case CommandType::Ping:
       sendTelemetry(true, cmd.seq);

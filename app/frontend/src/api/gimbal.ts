@@ -18,10 +18,37 @@ export function useCenterGimbal() {
   })
 }
 
+export function useHomeGimbal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () => api.post('/api/gimbal/home'),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: STATUS_KEY }),
+  })
+}
+
 export function useSetTrackingMode() {
   const queryClient = useQueryClient()
   return useMutation({
     mutationFn: (enabled: boolean) => api.post('/api/tracking/mode', { enabled }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: STATUS_KEY }),
+  })
+}
+
+interface JogDelta {
+  pan_deg?: number
+  tilt_deg?: number
+}
+
+export function useJogGimbal() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (delta: JogDelta) => api.post<{ ok: boolean }>('/api/gimbal/jog', delta),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: STATUS_KEY }),
+  })
+}
+
+export function useStopGimbal() {
+  return useMutation({
+    mutationFn: () => api.post('/api/gimbal/stop'),
   })
 }
