@@ -2,7 +2,7 @@
 
 One iteration feeds three consumers from a single pass (see
 docs/architecture.md's end-to-end flow):
-  1. a `move_delta` command to the Arduino Uno (tracking correction, largest face)
+  1. a `move_delta` command to the Arduino MKR Zero (tracking correction, largest face)
   2. the latest annotated JPEG frame (for the MJPEG endpoint)
   3. a structured event (all detections/name-or-Desconocido/telemetry) for
      WebSocket subscribers
@@ -834,7 +834,7 @@ class Pipeline(object):
                 "centered": delta is None,
             }
             # The UI shows this offset/correction regardless of whether
-            # tracking is paused, but the Arduino Uno only moves while enabled.
+            # tracking is paused, but the Arduino MKR Zero only moves while enabled.
             if delta is not None and self._tracking_enabled and not self._scan_active:
                 self._serial_link.send_move_delta(delta.pan_deg, delta.tilt_deg)
 

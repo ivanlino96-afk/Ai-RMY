@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { DetectionEvent } from '../types/api'
 
 // Reconnects with a fixed short backoff — the pipeline event stream is a
-// live operating view, not a critical control path (the Arduino Uno remains the
+// live operating view, not a critical control path (the Arduino MKR Zero remains the
 // authority over motor limits regardless of this socket's state).
 const RECONNECT_DELAY_MS = 1500
 

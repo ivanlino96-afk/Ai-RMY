@@ -1,4 +1,4 @@
-"""pyserial client talking to the Arduino Uno gimbal controller.
+"""pyserial client talking to the Arduino MKR Zero gimbal controller.
 
 Handles the two realities of a USB-serial link to a microcontroller that
 this module owns end to end:

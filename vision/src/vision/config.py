@@ -8,7 +8,7 @@ Python 3.6 compatible: NamedTuple instead of dataclasses.
 
 from typing import NamedTuple, Tuple
 
-# Mirrors firmware/src/main.cpp's kLimits -- the Arduino Uno remains the sole
+# Mirrors firmware/src/main.cpp's kLimits -- the Arduino MKR Zero remains the sole
 # enforcement authority (see AGENTS.md); this is only used to avoid starting
 # a scan whose configured range would silently truncate at the firmware
 # boundary.
@@ -126,7 +126,7 @@ class DefenseModeConfig(NamedTuple):
 
 def validate_scan_config(scan_config):
     """Clamps pan/tilt_range_deg to the firmware's soft limits. UX-only --
-    the Arduino Uno re-validates every goto regardless (see AGENTS.md)."""
+    the Arduino MKR Zero re-validates every goto regardless (see AGENTS.md)."""
     pan_lo, pan_hi = scan_config.pan_range_deg
     tilt_lo, tilt_hi = scan_config.tilt_range_deg
     fw_pan_lo, fw_pan_hi = FIRMWARE_PAN_LIMITS_DEG

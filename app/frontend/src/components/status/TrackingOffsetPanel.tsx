@@ -9,7 +9,7 @@ interface TrackingOffsetPanelProps {
   frameHeight: number | null
 }
 
-// Same numbers vision/pipeline.py computes and sends to the Arduino Uno via
+// Same numbers vision/pipeline.py computes and sends to the Arduino MKR Zero via
 // TrackingController.compute() — this panel only displays them, it does
 // not recompute the geometry independently.
 export function TrackingOffsetPanel({ offset, frameWidth, frameHeight }: TrackingOffsetPanelProps) {

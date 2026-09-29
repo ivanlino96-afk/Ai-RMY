@@ -5,14 +5,18 @@
 #include "GimbalControl.h"
 #include "SerialProtocol.h"
 
-// Arduino Uno (ATmega328P), per docs/hardware-wiring.md. D0/D1 are reserved
-// for the hardware UART (USB Serial link to the Jetson) and D13 is tied to
-// the onboard LED/SPI SCK (avoided to prevent a boot-time glitch) — neither
-// is used for STEP/DIR/ENABLE.
-static const uint8_t kPanStepPin = 2;
-static const uint8_t kPanDirPin = 3;
-static const uint8_t kTiltStepPin = 4;
-static const uint8_t kTiltDirPin = 5;
+// Arduino MKR Zero (SAMD21, ARM Cortex-M0+ @ 48MHz, 3.3V logic), per
+// docs/hardware-wiring.md. Serial here is the native USB CDC port -- unlike
+// the AVR Uno this replaced, D0/D1 have no hardware-UART role on this board
+// (Serial1 lives on D13/D14 instead) and are free for STEP/DIR. D13/D14 are
+// still avoided to keep Serial1 available if ever needed. These pins sink
+// current (LOW = active pulse); PUL+/DIR+ of both TB6600 drivers are wired
+// to the board's own +5V rail (see docs/hardware-wiring.md — the MKR Zero's
+// ~7mA/pin limit isn't enough to source a 5V-opto input directly).
+static const uint8_t kPanStepPin = 1;
+static const uint8_t kPanDirPin = 2;
+static const uint8_t kTiltStepPin = 3;
+static const uint8_t kTiltDirPin = 4;
 
 // TODO(hardware-wiring.md): depends on TB6600 microstepping DIP switches and
 // motor step angle. Placeholder assumes 200 full steps/rev * 1/8 microstepping
@@ -80,7 +84,7 @@ void handleLine(const std::string &line) {
 }
 
 void setup() {
-  Serial.begin(115200);
+  Serial.begin(115200);  // baud is ignored on native USB CDC (SAMD21); kept for portability
   gimbal.begin();
 }
 

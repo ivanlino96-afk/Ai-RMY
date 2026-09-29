@@ -1,4 +1,4 @@
-# Protocolo serial Jetson ↔ Arduino Uno
+# Protocolo serial Jetson ↔ Arduino MKR Zero
 
 Fuente única de verdad. `firmware/lib/SerialProtocol` y `vision/src/vision/serial_link`
 deben implementar exactamente esto — cualquier cambio se hace aquí primero.
@@ -7,7 +7,7 @@ deben implementar exactamente esto — cualquier cambio se hace aquí primero.
 - Formato: una línea de JSON por mensaje (NDJSON), terminada en `\n`.
 - Todo mensaje incluye `"proto": 1`.
 
-## Jetson → Arduino Uno
+## Jetson → Arduino MKR Zero
 
 | `cmd` | Campos | Descripción |
 | --- | --- | --- |
@@ -22,7 +22,7 @@ Ejemplo:
 {"proto":1,"cmd":"move_delta","pan":-1.2,"tilt":0.4,"seq":102}
 ```
 
-## Arduino Uno → Jetson
+## Arduino MKR Zero → Jetson
 
 Ack inmediato por comando recibido, más telemetría periódica (~10 Hz) aunque no
 haya comandos entrantes:
@@ -43,7 +43,7 @@ haya comandos entrantes:
 
 ## Watchdog
 
-Si el Arduino Uno no recibe un mensaje válido dentro del timeout configurado, debe
+Si el Arduino MKR Zero no recibe un mensaje válido dentro del timeout configurado, debe
 mantener la posición actual (no continuar extrapolando movimiento) y
 reportarlo en la telemetría (`moving: false`).
 
@@ -58,4 +58,4 @@ tardar en completarse más que el intervalo de ping.
 
 Configurados en firmware (`lib/GimbalControl`), no en la Jetson. Todo `move_delta`
 o `goto` que exceda el rango configurado se recorta o rechaza (`ok: false`) — el
-Arduino Uno nunca confía en que el lado Jetson ya validó el rango.
+Arduino MKR Zero nunca confía en que el lado Jetson ya validó el rango.

@@ -4,13 +4,13 @@
 
 Ai-RMY es un gimbal pan-tilt de seguimiento facial:
 
-- Controlador de movimiento: Arduino Uno (ATmega328P, Arduino framework, PlatformIO).
+- Controlador de movimiento: Arduino MKR Zero (SAMD21, ARM Cortex-M0+ @ 48MHz, 3.3V lógico, Arduino framework, PlatformIO).
 - Actuadores: 2 motores a pasos NEMA17 (pan, tilt) vía drivers TB6600 (interfaz STEP/DIR).
 - Visión: Jetson Nano corriendo detección facial (OpenCV YuNet) + reconocimiento
   (embedding ONNX + match coseno contra rostros guardados).
 - Cliente: dashboard web (React + Tailwind CSS), servido por el backend FastAPI que
   corre en la propia Jetson.
-- Comunicación motor: USB Serial (NDJSON) entre Jetson y Arduino Uno. Ver `docs/protocol.md`
+- Comunicación motor: USB Serial (NDJSON) entre Jetson y Arduino MKR Zero. Ver `docs/protocol.md`
   como única fuente de verdad del protocolo — firmware y vision deben implementarlo
   idéntico.
 - Alcance de red: solo LAN. Sin acceso remoto/cloud, sin autenticación en el MVP.
@@ -37,15 +37,19 @@ sospechoso).
 
 ## Reglas de seguridad obligatorias
 
-- El Arduino Uno es la autoridad final: toda orden recibida por serial debe validar
-  límites suaves de pan/tilt antes de mover los motores, sin depender de que la
-  Jetson ya los haya validado.
+- El Arduino MKR Zero es la autoridad final: toda orden recibida por serial debe
+  validar límites suaves de pan/tilt antes de mover los motores, sin depender de
+  que la Jetson ya los haya validado.
 - Ante ausencia de un comando válido por el timeout configurado (watchdog, ver
   `docs/protocol.md`), mantener la posición actual — nunca extrapolar movimiento sin
   confirmación reciente del host.
 - `stop` tiene la máxima prioridad y corta cualquier movimiento en curso de inmediato.
 - Los motores se alimentan desde una fuente externa propia (24V, acorde al driver TB6600),
-  con masa común al Arduino Uno. Nunca alimentar los motores desde el riel 5V/USB del Arduino.
+  con masa común al Arduino MKR Zero. Nunca alimentar los motores desde el riel 5V/USB del
+  Arduino.
+- El MKR Zero es lógica 3.3V y **no tolerante a 5V** (máx. ~7mA por pin) — el lado `+` de
+  PUL/DIR/ENA de ambos TB6600 va al común `+5V` del propio MKR Zero (no a un pin digital);
+  el Arduino solo hunde corriente por el lado `-`. Ver `docs/hardware-wiring.md`.
 - No commitear nunca datos biométricos: fotos de rostros y `faces.db` viven en
   `vision/data/` (gitignored). Los modelos `.onnx` tampoco se commitean (se descargan
   vía `scripts/download_models.sh`).
@@ -58,18 +62,20 @@ sospechoso).
 
 ### Firmware (`firmware/`)
 
-- PlatformIO + Arduino framework, target Arduino Uno (ATmega328P, `env:uno`).
+- PlatformIO + Arduino framework, target Arduino MKR Zero (SAMD21, `env:mkrzero`).
 - `AccelStepper` para control de los 2 ejes; si aparece jitter con la carga de
   serial+watchdog, la ruta de mejora documentada es `FastAccelStepper` (no reescribir
   desde cero, migrar el wrapper en `lib/GimbalControl`).
 - `lib/SerialProtocol/` parsea y serializa NDJSON según `docs/protocol.md` — no
   duplicar la lógica del protocolo en `main.cpp`.
 - `lib/GimbalControl/` encapsula límites suaves, watchdog y homing manual.
-- Compatibilidad: el ATmega328P tiene 2KB SRAM / 32KB flash (bastante menos
-  que otros targets considerados antes) — el stack actual (`std::string` +
-  `ArduinoJson` `JsonDocument` + 2x `AccelStepper`) no está benchmarkeado en
-  memoria; validar en banco (`pio run -e uno`, uso de RAM/flash reportado por
-  el build) antes de asumir que entra sin ajustes. Ver `docs/hardware-wiring.md`.
+- Compatibilidad: el SAMD21 tiene 32KB SRAM / 256KB flash — bastante más margen que
+  el ATmega328P considerado antes, el stack actual (`std::string` + `ArduinoJson`
+  `JsonDocument` + 2x `AccelStepper`) no debería ser un problema de memoria. El punto
+  a validar en banco ahora es otro: el MKR Zero es lógica 3.3V (no 5V-tolerant, máx.
+  7mA/pin) — confirmar con `pio run -e mkrzero` que compila y, en banco, que el
+  opto-acoplador del TB6600 dispara de forma confiable con ese esquema. Ver
+  `docs/hardware-wiring.md`.
 
 ### Vision (`vision/`)
 

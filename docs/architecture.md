@@ -12,7 +12,7 @@ documento es la referencia detallada de diseño.
         [Jetson: controlador P/deadband]   [nombre/"Unknown" + confianza]
                     |                              |
                     v                              v
-        [move_delta por USB Serial] -> [Arduino Uno: valida límites, mueve steppers]
+        [move_delta por USB Serial] -> [Arduino MKR Zero: valida límites, mueve steppers]
                     |
                     v
         [frame anotado + evento] -> [FastAPI: MJPEG + WebSocket] -> [Dashboard React]
@@ -29,7 +29,7 @@ el plan de arquitectura original.
 3. Offset en píxeles vs. centro del frame → controlador P con deadband → delta
    pan/tilt.
 4. Delta enviado como `move_delta` (ver `docs/protocol.md`) por USB Serial.
-5. Arduino Uno valida límites suaves, mueve `AccelStepper`, responde telemetría.
+5. Arduino MKR Zero valida límites suaves, mueve `AccelStepper`, responde telemetría.
 6. El siguiente frame refleja la nueva orientación (retroalimentación de visual
    servoing — no hay encoder, el frame siguiente es la confirmación).
 7. En paralelo, a cadencia reducida (cada 5-10 frames), el crop del rostro

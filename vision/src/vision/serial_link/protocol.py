@@ -52,7 +52,7 @@ def encode_ping(seq=0):
 
 
 def parse_telemetry(line):
-    """Parse one line of Arduino Uno->Jetson telemetry/ack JSON.
+    """Parse one line of Arduino MKR Zero->Jetson telemetry/ack JSON.
 
     Returns None if the line isn't valid JSON, is missing required fields,
     or doesn't match the protocol version this client speaks — callers

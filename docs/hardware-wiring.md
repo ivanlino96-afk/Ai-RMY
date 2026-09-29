@@ -15,14 +15,18 @@ asumir pinout desde el orden de cableado — validar aquí y en calibración.
   con `v4l2-ctl --list-formats-ext -d /dev/video0` si la cámara entrega MJPEG
   (decode liviano) o YUYV crudo (pesado, puede saturar USB2) a esas
   resoluciones, y medir el FPS real resultante.
-- **Dev board**: Arduino Uno (ATmega328P, 8-bit AVR @ 16MHz). Ver
-  **"Firmware — estado aplicado"** más abajo para el env de PlatformIO.
-  Riesgo a validar en banco: 2KB SRAM / 32KB flash es bastante menos que
-  módulos anteriores considerados para este proyecto — el stack actual
-  (`std::string` + `ArduinoJson` `JsonDocument` + 2x `AccelStepper` + parsing
-  NDJSON + watchdog) no está benchmarkeado en memoria todavía. Validar con
-  `pio run -e uno` (uso de flash/RAM en el build) antes de dar por cerrado el
-  target.
+- **Dev board**: Arduino MKR Zero (SAMD21, ARM Cortex-M0+ @ 48MHz, lógica
+  **3.3V y no tolerante a 5V**). Ver **"Firmware — estado aplicado"** más abajo
+  para el env de PlatformIO. 32KB SRAM / 256KB flash da bastante margen sobre
+  el Arduino Uno considerado antes (el stack actual — `std::string` +
+  `ArduinoJson` `JsonDocument` + 2x `AccelStepper` + parsing NDJSON + watchdog
+  — no debería ser un problema de memoria). El riesgo a validar en banco ahora
+  es otro: cada pin del MKR Zero solo puede entregar/hundir ~7mA, muy por
+  debajo de lo que un opto-acoplador de TB6600 pensado para 5V puede necesitar
+  para disparar de forma confiable — de ahí el esquema de wiring (común `+`
+  a 5V, MCU solo hunde corriente) descrito más abajo. Validar con
+  `pio run -e mkrzero` (compila, uso de flash/RAM) y en banco a baja
+  velocidad antes de dar por cerrado el target.
 - **Motores**: 2x NEMA17 (pan, tilt).
 - **Drivers**: 2x TB6600 (interfaz STEP/DIR, opto-aislada).
 - **Alimentación de motores**: fuente externa 24V dedicada (corriente nominal
@@ -68,59 +72,69 @@ asumir pinout desde el orden de cableado — validar aquí y en calibración.
 
                      PUL+ DIR+ ENA+           PUL+ DIR+ ENA+
                        │    │    │              │    │    │
-                       └────┴────┴──────┬───────┴────┴────┘
-                                         │
-                                    Arduino Uno 5V
-                                  (común a ambos drivers)
+                       └────┴────┼──────┬───────┴────┴────┘
+                                  │      │
+                              (sin conectar,      MKR Zero +5V
+                            ENA flotante = OK)   (común a ambos drivers)
 
-  Arduino Uno D2 ── PUL- (TB6600 PAN, STEP)
-  Arduino Uno D3 ── DIR- (TB6600 PAN, DIR)
-  Arduino Uno D4 ── PUL- (TB6600 TILT, STEP)
-  Arduino Uno D5 ── DIR- (TB6600 TILT, DIR)
-  Arduino Uno D6 ── ENA- (compartido: ambos TB6600 ENA- juntos, opcional)
-  Arduino Uno GND ─ GND fuente 24V ── GND ambos TB6600  (masa común)
+  MKR Zero D1 ── PUL- (TB6600 PAN, STEP)
+  MKR Zero D2 ── DIR- (TB6600 PAN, DIR)
+  MKR Zero D3 ── PUL- (TB6600 TILT, STEP)
+  MKR Zero D4 ── DIR- (TB6600 TILT, DIR)
+  ENA+ / ENA- (ambos drivers) ── sin conectar (ver notas: habilitados por defecto)
+  MKR Zero GND ─ GND fuente 24V ── GND ambos TB6600  (masa común)
 ```
 
 Notas del lado lógico (PUL/DIR/ENA):
-- Común a **+5V** del Arduino Uno: a diferencia de un ESP32-C3 (3.3V,
-  GPIO no 5V-tolerant), el Uno es lógica 5V nativa — atar el lado `+` a 5V es
-  el escenario estándar/más robusto para el opto-acoplador de entrada del
-  TB6600 (mejor margen de ruido que a 3.3V), sin riesgo de sobretensión.
-  El Uno hunde corriente directamente al poner el pin en LOW (pulso activo)
-  — funciona en la mayoría de los módulos TB6600 sin resistencia extra, pero
-  **validar en banco** a baja velocidad antes de confiar el wiring final.
-- `ENA-` puede dejarse sin conectar si se prefiere: la mayoría de los TB6600
-  quedan habilitados por defecto con ENA flotante. Conectarlo a un pin es
-  opcional (permite deshabilitar el holding torque desde firmware, no
-  implementado todavía en `GimbalControl`).
-- D2-D6 se eligieron por ser pines libres sin rol especial en el boot.
-  **Evitar** D0/D1 (UART por hardware — es el mismo puerto serial que usa el
-  USB Serial hacia la Jetson, no hay un puerto USB nativo separado como en el
-  ESP32-C3) y D13 (LED integrado + SPI SCK — un pulso espurio al resetear
-  podría enviar un `STEP` fantasma si se usara para esa señal) para
-  STEP/DIR/ENA. D2/D3 son además los únicos pines con interrupción externa
-  (INT0/INT1) del Uno — no se necesitan sin limit switches, pero quedan
-  libres para eso si el diseño cambia más adelante.
+- El MKR Zero es lógica **3.3V y no tolerante a 5V**, con un límite de
+  ~7mA por pin — muy poco margen para alimentar directamente el lado `+`
+  de un opto-acoplador de TB6600 dimensionado para 5V (a diferencia del
+  Arduino Uno, que era 5V nativo y podía hacerlo sin margen de ruido
+  reducido). Por eso el esquema se invierte respecto al de un Uno: el lado
+  `+` de PUL/DIR de ambos drivers va al pin **`+5V`** propio del MKR Zero
+  (rail común, no un pin digital — no lo genera un regulador propio del
+  MKR Zero sino que viene del USB, ver hoja de datos), y cada pin digital
+  (D1-D4) solo **hunde corriente** poniéndose en LOW para el pulso activo,
+  igual que antes pero con los roles `+`/`-` intercambiados. **Validar en
+  banco** a baja velocidad que el opto-acoplador dispara de forma confiable
+  con esta corriente antes de confiar el wiring final — si no dispara con
+  margen, la alternativa es una resistencia limitadora recalculada para
+  3.3V o un driver de nivel intermedio (no implementado, ver riesgo en
+  "Confirmado" arriba).
+- `ENA+`/`ENA-` se dejan **sin conectar** en ambos drivers: la mayoría de los
+  TB6600 quedan habilitados (holding torque activo) por defecto con ENA
+  flotante — decisión confirmada para este proyecto por simplicidad. No hay
+  forma de deshabilitar el torque desde firmware con este wiring (no
+  implementado en `GimbalControl` de todas formas).
+- D1-D4 se eligieron por ser pines libres sin rol especial de arranque en el
+  MKR Zero. A diferencia del Uno, el Serial que habla con la Jetson es
+  **USB nativo (USB-CDC)** en el SAMD21, no una UART sobre D0/D1 — por lo
+  tanto D0/D1 quedan libres de cualquier conflicto con el enlace serial (se
+  evitan igual, por si se necesitan a futuro para I2S). D13/D14 se evitan
+  porque son la UART física `Serial1` del MKR Zero (no usada hoy, pero se
+  deja libre por si hiciera falta telemetría/depuración separada del enlace
+  USB con la Jetson).
 
-## Pinout Arduino Uno
+## Pinout Arduino MKR Zero
 
-| Señal | Pin Uno | Nota |
+| Señal | Pin MKR Zero | Nota |
 | --- | --- | --- |
-| STEP (pan) | D2 | |
-| DIR (pan) | D3 | |
-| STEP (tilt) | D4 | |
-| DIR (tilt) | D5 | |
-| ENABLE (ambos drivers, compartido) | D6 | opcional, ver notas arriba; no usado desde firmware hoy |
-| Común lógico (PUL+/DIR+/ENA+, ambos drivers) | 5V | |
+| STEP (pan) | D1 | hunde corriente (LOW = pulso activo) |
+| DIR (pan) | D2 | hunde corriente |
+| STEP (tilt) | D3 | hunde corriente |
+| DIR (tilt) | D4 | hunde corriente |
+| ENABLE (ambos drivers) | — | sin conectar, ver notas arriba; no usado desde firmware hoy |
+| Común lógico (PUL+/DIR+, ambos drivers) | +5V | rail común del MKR Zero, no un pin digital |
 | GND | GND | común con fuente 24V y ambos TB6600 |
 
-Pines libres para expansión futura: D7-D12 (D13 evitado, ver notas), A0-A5.
+Pines libres para expansión futura: D0, D5-D12 (D13/D14 evitados, ver
+notas), A0-A6.
 
 ## Firmware — estado aplicado
 
-`firmware/platformio.ini` apunta a `[env:uno]` (`platform = atmelavr`,
-`board = uno`) y `firmware/src/main.cpp` usa D2/D3/D4/D5 (tabla de arriba).
-Sigue pendiente de bench:
+`firmware/platformio.ini` apunta a `[env:mkrzero]` (`platform = atmelsam`,
+`board = mkrzero`) y `firmware/src/main.cpp` usa D1/D2/D3/D4 (tabla de
+arriba). Sigue pendiente de bench:
 - `kStepsPerDegree` sigue como placeholder (asume 1/8 microstepping) hasta
   definir el DIP del TB6600.
 - Watchdog de `GimbalControl` (`main.cpp`) subido a 3000ms explícitos (antes
@@ -137,17 +151,15 @@ Sigue pendiente de bench:
 El path `/dev/ttyUSB0`/`/dev/ttyACM0` no está garantizado entre reinicios o
 reconexiones. Crear una regla udev que mapee el Arduino por vendor/product ID
 (y número de serie si el chip USB-UART lo expone) a un symlink estable, ej.
-`/dev/gimbal`. A diferencia del ESP32-C3 (USB nativo, un solo chip), el
-identificador USB del Uno depende de **qué variante física** se use — **verificar
-con `lsusb` antes de escribir la regla**, no asumir:
-- **Arduino Uno R3 original** (ATmega16U2 como puente USB-serial): vendor ID
-  `2341` (Arduino LLC), product ID típicamente `0043` (R3) u `0001`
-  (revisiones más viejas). Aparece como `/dev/ttyACM0`.
-- **Clones** (muy comunes, chip CH340 como puente USB-serial): vendor ID
-  `1a86`, product ID `7523`. Aparece como `/dev/ttyUSB0` (puede requerir el
-  driver `ch341` en el kernel, ya incluido en la mayoría de las distros
-  recientes de JetPack/Ubuntu).
+`/dev/gimbal`.
 
-Confirmar con `lsusb` y `udevadm info -a -n /dev/ttyACM0` (o `/dev/ttyUSB0`)
-el vendor/product ID exacto antes de escribir la regla — ver
-`scripts/provision_jetson.sh` (todavía no creado).
+El MKR Zero usa **USB nativo (USB-CDC) del SAMD21**, no un puente USB-serial
+externo como el ATmega16U2 del Uno o un CH340 de clon — un solo chip, un solo
+identificador USB, sin ambigüedad de "variante física" a verificar. El vendor
+ID `2341` (Arduino LLC) está confirmado (fuente oficial Arduino); el product
+ID específico del MKR Zero **no está verificado aquí todavía** — no asumirlo
+de una búsqueda no confirmada. Aparece como `/dev/ttyACM0`.
+
+Confirmar con `lsusb` y `udevadm info -a -n /dev/ttyACM0` el vendor/product ID
+exacto antes de escribir la regla — ver `scripts/provision_jetson.sh`
+(todavía no creado).
