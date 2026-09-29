@@ -19,8 +19,15 @@ FRONTEND_DIST = os.path.join(
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     config = PipelineConfig()
+    serial_port = os.environ.get("AI_RMY_SERIAL_PORT")
+    if serial_port:
+        config = config._replace(
+            serial_link=config.serial_link._replace(port=serial_port)
+        )
     repository = FaceRepository(config.storage)
     pipeline = Pipeline(config=config, repository=repository)
+    if os.environ.get("AI_RMY_TRACKING_ENABLED", "1") == "0":
+        pipeline.set_tracking_enabled(False)
     app.state.repository = repository
     app.state.pipeline = pipeline
     app.state.enrollment_sessions = {}

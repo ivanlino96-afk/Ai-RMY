@@ -48,3 +48,20 @@ def test_emergency_stop_disarms_defense_mode(client, fake_pipeline):
 
     assert response.json() == {"ok": True}
     assert fake_pipeline._defense_active is False
+
+
+def test_steps_reject_invalid_payloads(client):
+    for value in (2001, -2001, 1.5, True, '20'):
+        assert client.post('/api/gimbal/steps', json={'pan_steps': value}).status_code == 422
+    assert client.post('/api/gimbal/steps', json={'pan_steps': 1, 'tilt_steps': 1}).json() == {'ok': False}
+    assert client.post('/api/gimbal/steps', json={}).json() == {'ok': False}
+
+
+def test_steps_forward_one_axis(client, fake_pipeline):
+    calls = []
+    def jog_steps(pan, tilt):
+        calls.append((pan, tilt))
+        return True
+    fake_pipeline.jog_steps = jog_steps
+    assert client.post('/api/gimbal/steps', json={'tilt_steps': -2000}).json() == {'ok': True}
+    assert calls == [(0, -2000)]

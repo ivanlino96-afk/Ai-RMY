@@ -5,6 +5,7 @@ import { CornerBracketPanel } from '../components/hud/CornerBracketPanel'
 import { CameraSelectPanel } from '../components/status/CameraSelectPanel'
 import { DefenseLogPanel } from '../components/status/DefenseLogPanel'
 import { DefenseModePanel } from '../components/status/DefenseModePanel'
+import { TrackingModePanel } from '../components/status/TrackingModePanel'
 import { GimbalStatusPanel } from '../components/status/GimbalStatusPanel'
 import { TrackedPersonPanel } from '../components/status/TrackedPersonPanel'
 import { TrackingOffsetPanel } from '../components/status/TrackingOffsetPanel'
@@ -95,6 +96,7 @@ export function LiveViewPage({ detection }: LiveViewPageProps) {
         </div>
 
         <div className="space-y-6 lg:col-span-1 lg:h-full lg:min-h-0 lg:space-y-1.5 lg:overflow-y-auto lg:pr-1">
+          <TrackingModePanel status={status} />
           <CameraSelectPanel event={detection.event} />
           <TrackingOffsetPanel
             offset={detection.event?.tracking_offset ?? null}

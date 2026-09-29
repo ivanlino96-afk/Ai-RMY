@@ -58,12 +58,12 @@ class TrackingConfig(NamedTuple):
     deadband_fraction: float = 0.05
     # Proportional gain: degrees of pan/tilt correction per normalized pixel
     # offset (offset in [-1, 1] relative to frame half-size).
-    gain_pan_deg: float = 8.0
-    gain_tilt_deg: float = 6.0
+    gain_pan_deg: float = -30.0
+    gain_tilt_deg: float = 25.0
     # Per-tick cap so a single correction can't be huge (e.g. detection
     # jumping to a different face). Enforced here in addition to the
     # firmware's own soft limits.
-    max_delta_deg: float = 4.0
+    max_delta_deg: float = 15.0
 
 
 class SerialLinkConfig(NamedTuple):

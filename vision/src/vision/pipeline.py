@@ -25,6 +25,7 @@ import uuid
 
 from vision.capture.camera import Camera, list_available_cameras
 from vision.config import PipelineConfig, validate_scan_config
+from vision.motor_settings import MotorSettings, StepLimits
 from vision.detection.objects import ObjectDetector
 from vision.detection.yunet import YuNetDetector
 from vision.recognition.embedder import FaceEmbedder
@@ -180,6 +181,10 @@ class Pipeline(object):
 
         self._tracking_controller = TrackingController(self._config.tracking)
         self._serial_link = SerialLink(self._config.serial_link)
+        settings_path = (os.path.join(os.path.dirname(self._config.storage.db_path), "motor-speeds.json")
+                         if self._config.storage.db_path != ":memory:" else None)
+        self.motor_settings = MotorSettings(settings_path)
+        self.step_limits = StepLimits(os.path.join(os.path.dirname(settings_path), "step-limits.json") if settings_path else None)
         self._identity_memory = _IdentityMemory(self._config.recognition.identity_memory_seconds)
 
         self._tracking_enabled = True
@@ -253,7 +258,8 @@ class Pipeline(object):
         gimbal -- auto-tracking must never race a scan's own goto sequence.
         Also refuses to disable while defense mode is armed -- defense mode
         forces tracking on for as long as it's active; disarm it instead."""
-        if enabled and self._scan_active:
+        if enabled and (self._scan_active or
+                        (self.last_telemetry is not None and self.last_telemetry.calibration)):
             return False
         if not enabled and self._defense_active:
             return False
@@ -262,8 +268,27 @@ class Pipeline(object):
             self._serial_link.send_stop()
         return True
 
+    def _motion_profile(self, name):
+        profile = self.motor_settings.get(name)
+        profile.update(self.step_limits.get("limits"))
+        return profile
+
+    def jog_steps(self, pan_steps, tilt_steps):
+        telemetry = self.last_telemetry
+        if (self._tracking_enabled or self._scan_active or self._defense_active or
+                not self.serial_connected or telemetry is None or
+                telemetry.moving):
+            return False
+        limits = self.step_limits.get("limits")
+        if not (limits["pan_min"] <= telemetry.pan_steps + pan_steps <= limits["pan_max"] and
+                limits["tilt_min"] <= telemetry.tilt_steps + tilt_steps <= limits["tilt_max"]):
+            return False
+        profile = self.motor_settings.get("manual")
+        profile.update(limits)
+        return self._serial_link.send_move_steps(pan_steps, tilt_steps, speeds=profile)
+
     def center(self):
-        self._serial_link.send_goto(0.0, 0.0)
+        self._serial_link.send_goto(0.0, 0.0, speeds=self._motion_profile("manual"))
 
     def home(self):
         """No limit switches: re-defines the gimbal's current physical
@@ -279,7 +304,7 @@ class Pipeline(object):
         applied in _process_frame."""
         if self._tracking_enabled:
             return False
-        self._serial_link.send_move_delta(pan_deg, tilt_deg)
+        self._serial_link.send_move_delta(pan_deg, tilt_deg, speeds=self._motion_profile("manual"))
         return True
 
     def emergency_stop(self):
@@ -296,7 +321,8 @@ class Pipeline(object):
         is enabled or another scan is already running -- serviced afterward,
         one waypoint per _run_once tick, by _service_scan()."""
         with self._scan_lock:
-            if self._tracking_enabled or self._scan_active:
+            if (self._tracking_enabled or self._scan_active or
+                    (self.last_telemetry is not None and self.last_telemetry.calibration)):
                 return False
             scan_config = self._config.scan
             if pan_range_deg is not None:
@@ -346,7 +372,8 @@ class Pipeline(object):
         (returns False) while a room scan is running -- both need exclusive
         use of the gimbal."""
         with self._defense_lock:
-            if self._defense_active:
+            if (self._defense_active or
+                    (self.last_telemetry is not None and self.last_telemetry.calibration)):
                 return False
             if self._scan_active:
                 return False
@@ -523,6 +550,8 @@ class Pipeline(object):
             # instead.
             logger.exception("vision pipeline: error processing frame, skipping it")
         if frame is None:
+            if self._tracking_enabled and not self._scan_active:
+                self._serial_link.send_stop()
             time.sleep(0.05)
 
     def _handle_frame(self, cv2, frame):
@@ -591,7 +620,7 @@ class Pipeline(object):
             now = time.monotonic()
 
             if not self._scan_waypoint_sent:
-                self._serial_link.send_goto(pan_deg, tilt_deg)
+                self._serial_link.send_goto(pan_deg, tilt_deg, speeds=self._motion_profile("automatic"))
                 self._scan_waypoint_sent = True
                 self._scan_waypoint_started_at = now
                 self._scan_waypoint_arrived_at = None
@@ -836,7 +865,13 @@ class Pipeline(object):
             # The UI shows this offset/correction regardless of whether
             # tracking is paused, but the Arduino MKR Zero only moves while enabled.
             if delta is not None and self._tracking_enabled and not self._scan_active:
-                self._serial_link.send_move_delta(delta.pan_deg, delta.tilt_deg)
+                self._serial_link.send_move_delta(delta.pan_deg, delta.tilt_deg, speeds=self._motion_profile("automatic"))
+
+        # Hold when the face is centered or lost; do not finish a stale correction.
+        if self._tracking_enabled and not self._scan_active and (target is None or tracking_offset["centered"]):
+            telemetry = self.last_telemetry
+            if telemetry is not None and telemetry.moving:
+                self._serial_link.send_stop()
 
         annotated = self._annotate(cv2, frame)
         ok, buf = cv2.imencode(".jpg", annotated)

@@ -18,7 +18,7 @@ export function TopBar({ serialConnected, socketConnected }: TopBarProps) {
       <div className="flex items-center justify-between pt-4">
         <div className="flex items-center gap-8">
           <span className="text-sm tracking-[0.14em] text-ink">AI-RMY</span>
-          <nav className="flex gap-6">
+          <nav className="flex flex-wrap gap-x-6 gap-y-3">
             <NavLink to="/" end className={NAV_LINK_CLASS}>
               Live view
             </NavLink>
@@ -31,6 +31,7 @@ export function TopBar({ serialConnected, socketConnected }: TopBarProps) {
             <NavLink to="/scan" className={NAV_LINK_CLASS}>
               Room scan
             </NavLink>
+            <NavLink to="/settings" className={NAV_LINK_CLASS}>Configuración</NavLink>
           </nav>
         </div>
 

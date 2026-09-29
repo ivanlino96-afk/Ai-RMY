@@ -1,31 +1,27 @@
 #include <Arduino.h>
 
-#include <string>
+
 
 #include "GimbalControl.h"
 #include "SerialProtocol.h"
 
-// Arduino MKR Zero (SAMD21, ARM Cortex-M0+ @ 48MHz, 3.3V logic), per
-// docs/hardware-wiring.md. Serial here is the native USB CDC port -- unlike
-// the AVR Uno this replaced, D0/D1 have no hardware-UART role on this board
-// (Serial1 lives on D13/D14 instead) and are free for STEP/DIR. D13/D14 are
-// still avoided to keep Serial1 available if ever needed. These pins sink
-// current (LOW = active pulse); PUL+/DIR+ of both TB6600 drivers are wired
-// to the board's own +5V rail (see docs/hardware-wiring.md — the MKR Zero's
-// ~7mA/pin limit isn't enough to source a 5V-opto input directly).
+// Board-specific STEP/DIR pins. Uno D0/D1 are reserved for USB UART.
+#if defined(ARDUINO_AVR_UNO)
+static const uint8_t kPanStepPin = 2;
+static const uint8_t kPanDirPin = 3;
+static const uint8_t kTiltStepPin = 4;
+static const uint8_t kTiltDirPin = 5;
+#else
 static const uint8_t kPanStepPin = 1;
 static const uint8_t kPanDirPin = 2;
 static const uint8_t kTiltStepPin = 3;
 static const uint8_t kTiltDirPin = 4;
+#endif
 
-// TODO(hardware-wiring.md): depends on TB6600 microstepping DIP switches and
-// motor step angle. Placeholder assumes 200 full steps/rev * 1/8 microstepping
-// = 1600 steps/rev -> 1600/360 steps per degree.
-static const float kStepsPerDegree = 1600.0f / 360.0f;
-
-// Conservative placeholder soft limits — widen only after bench testing at
-// low speed (see AGENTS.md).
-static const GimbalLimits kLimits = {-45.0f, 45.0f, -30.0f, 30.0f};
+// Operator-measured transmission; Tilt is approximate, not encoder feedback.
+static const float kPanStepsPerDegree = kPanTransmission;
+static const float kTiltStepsPerDegree = kTiltTransmission;
+static const GimbalLimits kLimits = {0.0f, 360.0f, -55.0f, 55.0f};
 
 static const unsigned long kTelemetryIntervalMs = 100;  // ~10 Hz
 
@@ -33,29 +29,66 @@ static const unsigned long kTelemetryIntervalMs = 100;  // ~10 Hz
 // vision/src/vision/config.py) so the periodic keep-alive ping actually
 // prevents a false trip during normal idle gaps or a single long manual jog.
 GimbalControl gimbal(kPanStepPin, kPanDirPin, kTiltStepPin, kTiltDirPin,
-                     kLimits, kStepsPerDegree, /*watchdogTimeoutMs=*/3000);
+                     kLimits, kPanStepsPerDegree, kTiltStepsPerDegree, /*watchdogTimeoutMs=*/3000);
 
+#ifdef GIMBAL_CALIBRATION
+static const bool kCalibration = true;
+#else
+static const bool kCalibration = false;
+#endif
 unsigned long lastTelemetryMs = 0;
-std::string serialBuffer;
+ProtocolString serialBuffer;
 
 void sendTelemetry(bool ok, long seq, const char *error = nullptr) {
-  std::string line = serializeTelemetry(ok, seq, gimbal.currentPanDeg(),
+#if defined(ARDUINO_ARCH_AVR)
+  writeTelemetry(Serial, ok, seq, gimbal.currentPanDeg(), gimbal.currentTiltDeg(),
+                 gimbal.isMoving(), gimbal.homed(), error, kCalibration,
+                 gimbal.currentPanSteps(), gimbal.currentTiltSteps());
+#else
+  ProtocolString line = serializeTelemetry(ok, seq, gimbal.currentPanDeg(),
                                          gimbal.currentTiltDeg(),
                                          gimbal.isMoving(), gimbal.homed(),
-                                         error);
+                                         error, kCalibration, gimbal.currentPanSteps(), gimbal.currentTiltSteps());
   Serial.println(line.c_str());
+#endif
 }
 
-void handleLine(const std::string &line) {
+void handleLine(const ProtocolString &line) {
   Command cmd;
   if (!parseCommand(line, cmd)) {
     sendTelemetry(false, 0, "malformed_or_unknown_command");
     return;
   }
 
+  if (kCalibration && (cmd.type == CommandType::MoveDelta || cmd.type == CommandType::Goto)) {
+    sendTelemetry(false, cmd.seq, "calibration_only");
+    return;
+  }
+  if (cmd.type == CommandType::MoveSteps && gimbal.isMoving()) {
+    sendTelemetry(false, cmd.seq, "steps_rejected");
+    return;
+  }
+  if ((cmd.type == CommandType::MoveSteps || cmd.type == CommandType::MoveDelta || cmd.type == CommandType::Goto) &&
+      !gimbal.setStepLimits(cmd.panMin, cmd.panMax, cmd.tiltMin, cmd.tiltMax)) {
+    sendTelemetry(false, cmd.seq, "invalid_step_limits");
+    return;
+  }
+  if (cmd.panSpeed && !gimbal.setSpeeds(cmd.panSpeed, cmd.tiltSpeed)) {
+    sendTelemetry(false, cmd.seq, "invalid_speed");
+    return;
+  }
+  if (cmd.panAccel && !gimbal.setAccelerations(cmd.panAccel, cmd.tiltAccel)) {
+    sendTelemetry(false, cmd.seq, "invalid_acceleration");
+    return;
+  }
   gimbal.noteCommandReceived();
 
   switch (cmd.type) {
+    case CommandType::MoveSteps: {
+      bool ok = gimbal.applySteps(cmd.panSteps, cmd.tiltSteps, cmd.panMin, cmd.panMax, cmd.tiltMin, cmd.tiltMax);
+      sendTelemetry(ok, cmd.seq, ok ? nullptr : "steps_rejected");
+      break;
+    }
     case CommandType::MoveDelta:
       gimbal.applyDelta(cmd.pan, cmd.tilt);
       sendTelemetry(true, cmd.seq);

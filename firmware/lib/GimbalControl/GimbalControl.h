@@ -21,9 +21,15 @@ class GimbalControl {
  public:
   GimbalControl(uint8_t panStepPin, uint8_t panDirPin, uint8_t tiltStepPin,
                 uint8_t tiltDirPin, GimbalLimits limits,
-                float stepsPerDegree, unsigned long watchdogTimeoutMs = 750);
+                float panStepsPerDegree, float tiltStepsPerDegree, unsigned long watchdogTimeoutMs = 750);
 
   void begin();
+  bool setStepLimits(long panMin, long panMax, long tiltMin, long tiltMax);
+  bool setSpeeds(long pan, long tilt);
+  bool setAccelerations(long pan, long tilt);
+  long currentPanSteps() { return panStepper_.currentPosition(); }
+  long currentTiltSteps() { return tiltStepper_.currentPosition(); }
+  bool applySteps(long pan, long tilt, long panMin = 0, long panMax = 12000, long tiltMin = -1500, long tiltMax = 1500);
 
   // Call every loop() iteration. Runs the steppers and, if the watchdog has
   // tripped (no valid command recently), holds the current position instead
@@ -65,11 +71,12 @@ class GimbalControl {
   AccelStepper panStepper_;
   AccelStepper tiltStepper_;
   GimbalLimits limits_;
-  float stepsPerDegree_;
+  float panStepsPerDegree_;
+  float tiltStepsPerDegree_;
   unsigned long watchdogTimeoutMs_;
   unsigned long lastCommandMs_ = 0;
   bool homed_ = false;
 
-  long degToSteps(float deg) const;
-  float stepsToDeg(long steps) const;
+  long degToSteps(float deg, float scale) const;
+  float stepsToDeg(long steps, float scale) const;
 };

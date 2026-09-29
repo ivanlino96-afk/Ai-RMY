@@ -22,6 +22,7 @@ from vision.serial_link.protocol import (
     encode_goto,
     encode_home,
     encode_move_delta,
+    encode_move_steps,
     encode_ping,
     encode_stop,
     parse_telemetry,
@@ -38,15 +39,19 @@ class SerialLink(object):
         self._on_telemetry = on_telemetry
         self._serial = None
         self._write_lock = threading.Lock()
+        self._ack_lock = threading.Lock()
+        self._pending_acks = {}
         self._seq = 0
         self._stop_event = threading.Event()
         self._thread = None
         self._connected = False
         self.last_telemetry = None
+        self._last_received_at = None
 
     @property
     def connected(self):
-        return self._connected
+        return (self._connected and self._last_received_at is not None and
+                time.monotonic() - self._last_received_at < 4.0)
 
     def start(self):
         self._stop_event.clear()
@@ -59,11 +64,15 @@ class SerialLink(object):
             self._thread.join(timeout=2.0)
         self._close()
 
-    def send_move_delta(self, pan, tilt):
-        self._send(encode_move_delta(pan, tilt, self._next_seq()))
+    def send_move_delta(self, pan, tilt, speeds=None):
+        self._send(encode_move_delta(pan, tilt, self._next_seq(), speeds))
 
-    def send_goto(self, pan_deg, tilt_deg):
-        self._send(encode_goto(pan_deg, tilt_deg, self._next_seq()))
+    def send_move_steps(self, pan, tilt, speeds=None):
+        seq = self._next_seq()
+        return self._send_confirmed(encode_move_steps(pan, tilt, seq, speeds), seq)
+
+    def send_goto(self, pan_deg, tilt_deg, speeds=None):
+        self._send(encode_goto(pan_deg, tilt_deg, self._next_seq(), speeds))
 
     def send_stop(self):
         self._send(encode_stop(self._next_seq()))
@@ -75,8 +84,37 @@ class SerialLink(object):
         self._send(encode_ping(self._next_seq()))
 
     def _next_seq(self):
-        self._seq += 1
-        return self._seq
+        with self._ack_lock:
+            self._seq += 1
+            return self._seq
+
+    def _send_confirmed(self, line, seq, timeout=2.0):
+        pending = {"event": threading.Event(), "ok": False}
+        with self._ack_lock:
+            self._pending_acks[seq] = pending
+        try:
+            if not self._send(line):
+                return False
+            if not pending["event"].wait(timeout):
+                logger.warning("No ACK for seq %s; not retrying motion", seq)
+                return False
+            return pending["ok"]
+        finally:
+            with self._ack_lock:
+                self._pending_acks.pop(seq, None)
+
+    def _accept_telemetry(self, telemetry):
+        self._last_received_at = time.monotonic()
+        if not telemetry.ok:
+            logger.warning("Arduino rejected seq %s: %s", telemetry.seq, telemetry.error)
+        self.last_telemetry = telemetry
+        with self._ack_lock:
+            pending = self._pending_acks.get(telemetry.seq)
+            if pending is not None:
+                pending["ok"] = telemetry.ok
+                pending["event"].set()
+        if self._on_telemetry is not None:
+            self._on_telemetry(telemetry)
 
     def _send(self, line):
         with self._write_lock:
@@ -112,9 +150,7 @@ class SerialLink(object):
             if line:
                 telemetry = parse_telemetry(line.decode("utf-8", errors="ignore"))
                 if telemetry is not None:
-                    self.last_telemetry = telemetry
-                    if self._on_telemetry is not None:
-                        self._on_telemetry(telemetry)
+                    self._accept_telemetry(telemetry)
 
             now = time.monotonic()
             if now - last_ping >= self._config.ping_interval_s:
@@ -142,6 +178,11 @@ class SerialLink(object):
         self._close()
 
     def _close(self):
+        self._last_received_at = None
+        self.last_telemetry = None
+        with self._ack_lock:
+            for pending in self._pending_acks.values():
+                pending["event"].set()
         if self._serial is not None:
             try:
                 self._serial.close()

@@ -62,9 +62,10 @@ class TrackingController(object):
             return None
 
         # Positive norm_x (target right of center) should pan the camera
-        # right to re-center it.
-        pan = norm_x * self._config.gain_pan_deg
-        tilt = norm_y * self._config.gain_tilt_deg
+        # right to re-center it. The current transmission needs negative Pan
+        # pulses for that direction (configured signed gain).
+        pan = 0.0 if abs(norm_x) < deadband else norm_x * self._config.gain_pan_deg
+        tilt = 0.0 if abs(norm_y) < deadband else norm_y * self._config.gain_tilt_deg
 
         pan = _clamp(pan, self._config.max_delta_deg)
         tilt = _clamp(tilt, self._config.max_delta_deg)

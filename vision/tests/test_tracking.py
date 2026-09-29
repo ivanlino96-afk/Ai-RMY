@@ -18,7 +18,7 @@ def test_offset_right_of_center_pans_right():
     offset = PixelOffset(dx=200, dy=0, frame_width=640, frame_height=480)
     delta = controller.compute(offset)
     assert delta is not None
-    assert delta.pan_deg > 0
+    assert delta.pan_deg < 0
     assert delta.tilt_deg == 0
 
 
@@ -31,11 +31,11 @@ def test_offset_below_center_tilts_down():
     assert delta.pan_deg == 0
 
 
-def test_offset_left_and_above_center_is_negative_both_axes():
+def test_offset_left_and_above_uses_inverted_pan_and_negative_tilt():
     controller = make_controller()
     offset = PixelOffset(dx=-200, dy=-150, frame_width=640, frame_height=480)
     delta = controller.compute(offset)
-    assert delta.pan_deg < 0
+    assert delta.pan_deg > 0
     assert delta.tilt_deg < 0
 
 
@@ -51,3 +51,18 @@ def test_zero_size_frame_returns_none():
     controller = make_controller()
     offset = PixelOffset(dx=10, dy=10, frame_width=0, frame_height=0)
     assert controller.compute(offset) is None
+
+
+def test_centered_axis_stays_still_when_other_axis_corrects():
+    controller = make_controller()
+    assert controller.compute(PixelOffset(1, 100, 640, 480)).pan_deg == 0
+    assert controller.compute(PixelOffset(100, 1, 640, 480)).tilt_deg == 0
+
+
+def test_large_error_allows_acceleration_distance_and_small_error_slows():
+    controller = make_controller()
+    far = controller.compute(PixelOffset(240, 180, 640, 480))
+    near = controller.compute(PixelOffset(20, 15, 640, 480))
+    assert far.pan_deg == -15 and far.tilt_deg == 15
+    assert 0 < abs(near.pan_deg) < abs(far.pan_deg)
+    assert 0 < near.tilt_deg < far.tilt_deg

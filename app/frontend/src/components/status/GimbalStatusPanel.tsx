@@ -1,4 +1,4 @@
-import { useCenterGimbal, useHomeGimbal, useSetTrackingMode } from '../../api/gimbal'
+import { useCenterGimbal, useHomeGimbal } from '../../api/gimbal'
 import { CornerBracketPanel } from '../hud/CornerBracketPanel'
 import { StatusBadge } from '../hud/StatusBadge'
 import { TelemetryRow } from '../hud/TelemetryRow'
@@ -11,9 +11,7 @@ interface GimbalStatusPanelProps {
 export function GimbalStatusPanel({ status }: GimbalStatusPanelProps) {
   const center = useCenterGimbal()
   const home = useHomeGimbal()
-  const setTrackingMode = useSetTrackingMode()
   const telemetry = status?.telemetry ?? null
-  const trackingEnabled = status?.tracking_enabled ?? false
 
   return (
     <CornerBracketPanel title="Gimbal" compact>
@@ -43,14 +41,6 @@ export function GimbalStatusPanel({ status }: GimbalStatusPanelProps) {
             className="flex-1 border border-hairline px-3 py-1 text-xs tracking-[0.1em] text-ink uppercase hover:border-lock hover:text-lock disabled:opacity-40"
           >
             Home
-          </button>
-          <button
-            type="button"
-            onClick={() => setTrackingMode.mutate(!trackingEnabled)}
-            disabled={setTrackingMode.isPending}
-            className="flex-1 border border-hairline px-3 py-1 text-xs tracking-[0.1em] text-ink uppercase hover:border-warn hover:text-warn disabled:opacity-40"
-          >
-            {trackingEnabled ? 'Pause tracking' : 'Resume tracking'}
           </button>
         </div>
       </div>

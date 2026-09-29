@@ -25,6 +25,9 @@ export interface Detection {
 }
 
 export interface Telemetry {
+  calibration: boolean
+  pan_steps: number
+  tilt_steps: number
   ok: boolean
   pan_deg: number
   tilt_deg: number

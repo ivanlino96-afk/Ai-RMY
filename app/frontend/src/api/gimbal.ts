@@ -8,7 +8,7 @@ export function useGimbalStatus() {
   return useQuery({
     queryKey: STATUS_KEY,
     queryFn: () => api.get<GimbalStatus>('/api/gimbal/status'),
-    refetchInterval: 3000,
+    refetchInterval: 500,
   })
 }
 
@@ -29,7 +29,11 @@ export function useHomeGimbal() {
 export function useSetTrackingMode() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (enabled: boolean) => api.post('/api/tracking/mode', { enabled }),
+    mutationFn: async (enabled: boolean) => {
+      const result = await api.post<{ ok: boolean; tracking_enabled: boolean }>('/api/tracking/mode', { enabled })
+      if (!result.ok) throw new Error('No se pudo cambiar el seguimiento. Desactiva la alarma o termina el escaneo e inténtalo de nuevo.')
+      return result
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: STATUS_KEY }),
   })
 }

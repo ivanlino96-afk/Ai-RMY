@@ -21,6 +21,9 @@ class Telemetry(NamedTuple):
     moving: bool
     homed: bool
     error: Optional[str] = None
+    calibration: bool = False
+    pan_steps: int = 0
+    tilt_steps: int = 0
 
 
 def _encode(payload):
@@ -29,13 +32,43 @@ def _encode(payload):
     return json.dumps(payload, separators=(",", ":")) + "\n"
 
 
-def encode_move_delta(pan, tilt, seq):
-    return _encode({"cmd": "move_delta", "pan": pan, "tilt": tilt, "seq": seq})
+def _with_speeds(payload, speeds):
+    if speeds is not None:
+        for axis in ("pan", "tilt"):
+            value = speeds[axis]
+            if type(value) is not int or not 1 <= value <= 4000:
+                raise ValueError("speed must be integer 1..4000 pulses/s")
+            payload[axis + "_speed"] = value
+        if "pan_acceleration" in speeds or "tilt_acceleration" in speeds:
+            for axis in ("pan", "tilt"):
+                value = speeds.get(axis + "_acceleration")
+                if type(value) is not int or not 1 <= value <= 20000:
+                    raise ValueError("acceleration must be integer 1..20000 pulses/s²")
+                payload[axis + "_accel"] = value
+        if any(key in speeds for key in ("pan_min", "pan_max", "tilt_min", "tilt_max")):
+            from vision.motor_settings import StepLimits
+            limits = {key: speeds.get(key) for key in ("pan_min", "pan_max", "tilt_min", "tilt_max")}
+            StepLimits._validate("limits", limits)
+            payload.update(limits)
+    return _encode(payload)
 
 
-def encode_goto(pan_deg, tilt_deg, seq):
-    return _encode(
-        {"cmd": "goto", "pan_deg": pan_deg, "tilt_deg": tilt_deg, "seq": seq}
+def encode_move_delta(pan, tilt, seq, speeds=None):
+    return _with_speeds({"cmd": "move_delta", "pan": pan, "tilt": tilt, "seq": seq}, speeds)
+
+
+def encode_move_steps(pan_steps, tilt_steps, seq, speeds=None):
+    if (type(pan_steps) is not int or type(tilt_steps) is not int or
+            abs(pan_steps) > 2000 or abs(tilt_steps) > 2000 or
+            (pan_steps == 0) == (tilt_steps == 0)):
+        raise ValueError("one axis, 1..2000 integer pulses")
+    return _with_speeds({"cmd": "move_steps", "pan_steps": pan_steps,
+                    "tilt_steps": tilt_steps, "seq": seq}, speeds)
+
+
+def encode_goto(pan_deg, tilt_deg, seq, speeds=None):
+    return _with_speeds(
+        {"cmd": "goto", "pan_deg": pan_deg, "tilt_deg": tilt_deg, "seq": seq}, speeds
     )
 
 
@@ -78,6 +111,9 @@ def parse_telemetry(line):
             moving=bool(doc["moving"]),
             homed=bool(doc["homed"]),
             error=doc.get("error"),
+            calibration=bool(doc.get("calibration", False)),
+            pan_steps=int(doc.get("pan_steps", 0)),
+            tilt_steps=int(doc.get("tilt_steps", 0)),
         )
     except (KeyError, TypeError, ValueError):
         return None

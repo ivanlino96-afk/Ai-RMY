@@ -1,3 +1,4 @@
+import { SettingsPage } from './pages/SettingsPage'
 import { Route, Routes } from 'react-router-dom'
 import { AppShell } from './components/layout/AppShell'
 import { LiveViewPage } from './pages/LiveViewPage'
@@ -13,6 +14,7 @@ export function App() {
           <Route path="/" element={<LiveViewPage detection={detection} />} />
           <Route path="/people" element={<PeoplePage />} />
           <Route path="/manual" element={<ManualModePage detection={detection} />} />
+          <Route path="/settings" element={<SettingsPage />} />
           <Route path="/scan" element={<RoomScanPage detection={detection} />} />
         </Routes>
       )}

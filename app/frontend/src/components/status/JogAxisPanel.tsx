@@ -16,7 +16,7 @@ interface JogAxisPanelProps {
 // One motor, jogged independently of the other — see docs/protocol.md's
 // move_delta: passing 0 on the other axis leaves it untouched.
 export function JogAxisPanel({ label, currentDeg, min, max, disabled, pending, onJog }: JogAxisPanelProps) {
-  const [amount, setAmount] = useState('10')
+  const [amount, setAmount] = useState('1')
   const parsed = Number.parseFloat(amount)
   const canJog = !disabled && !pending && Number.isFinite(parsed) && parsed !== 0
 

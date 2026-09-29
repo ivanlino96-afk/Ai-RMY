@@ -149,10 +149,10 @@ class FakeSerialLink(object):
         self.last_telemetry = None
         self.connected = True
 
-    def send_move_delta(self, pan_deg, tilt_deg):
+    def send_move_delta(self, pan_deg, tilt_deg, speeds=None):
         self.moves.append((pan_deg, tilt_deg))
 
-    def send_goto(self, pan_deg, tilt_deg):
+    def send_goto(self, pan_deg, tilt_deg, speeds=None):
         self.gotos.append((pan_deg, tilt_deg))
 
     def send_stop(self):
@@ -890,3 +890,14 @@ def test_defense_event_payload_present_once_armed(tmp_path):
     pipeline.start_defense_mode()
 
     assert pipeline._defense_event_payload() is not None
+
+
+@pytest.mark.parametrize('detections', [[], [_detection(40, 40)]])
+def test_tracking_holds_when_target_lost_or_centered(tmp_path, detections):
+    from vision.serial_link.protocol import Telemetry
+    pipeline = _pipeline(tmp_path, detections=detections)
+    pipeline._serial_link = FakeSerialLink()
+    pipeline._serial_link.last_telemetry = Telemetry(True, 0, 0, 0, True, True)
+    pipeline._process_frame(FakeCv2(), _frame())
+    assert pipeline._serial_link.stops == 1
+    assert pipeline._serial_link.moves == []

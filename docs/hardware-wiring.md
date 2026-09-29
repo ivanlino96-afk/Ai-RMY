@@ -163,3 +163,20 @@ de una búsqueda no confirmada. Aparece como `/dev/ttyACM0`.
 Confirmar con `lsusb` y `udevadm info -a -n /dev/ttyACM0` el vendor/product ID
 exacto antes de escribir la regla — ver `scripts/provision_jetson.sh`
 (todavía no creado).
+
+## Prueba comparativa con Arduino Uno
+
+Entorno `pio run -e uno`. Pan: PUL+ D2, DIR+ D3; tilt: PUL+ D4,
+DIR+ D5. PUL−/DIR− a GND (común cátodo). D0/D1 quedan reservados al
+serial USB. Este mapeo es distinto al MKR Zero: cambiar con alimentación
+apagada y verificar físicamente qué driver corresponde a cada eje.
+Conservar configuración de banco: 40 pasos/s, 40 pasos/s², límites pan ±45° y tilt ±30°.
+El Uno utiliza ArduinoJson 6 y String para ajustarse a la arquitectura AVR.
+
+Para contar pulsos sin la conversión angular provisional: usar el entorno
+`uno_calibration` y el panel Calibración por pasos en Manual Mode.
+Recompilar/cargar `uno` para volver a los límites angulares normales después
+de medir y ajustar pasos por grado. Ver `docs/protocol.md` para los topes.
+
+### Medición del conjunto actual
+El operador confirmó Pan 12000 pulsos/vuelta completa y Tilt ±1500 pulsos para aproximadamente ±55°. No asumir estas escalas si cambia el microstepping o las poleas. Pan positivo mueve hacia la derecha de quien mira de frente a la cámara (izquierda desde la cámara); Tilt positivo baja la cámara. Seguimiento sobre imagen sin espejo: invertir Pan, mantener Tilt. Validar visualmente antes de ajustar ganancias.
