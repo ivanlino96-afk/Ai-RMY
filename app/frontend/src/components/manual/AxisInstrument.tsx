@@ -14,7 +14,7 @@ interface Props {
 function AxisDiagram({ axis }: { axis: 'pan' | 'tilt' }) {
   const pan = axis === 'pan'
   return (
-    <svg viewBox="0 0 220 190" className="axis-diagram" aria-hidden="true">
+    <svg viewBox="0 0 220 190" className="max-h-[180px] w-full text-ink-dim" aria-hidden="true">
       <g fill="none" stroke="currentColor" strokeWidth="1">
         <path d="M10 95H210M110 8V182" opacity=".2" />
         <circle cx="110" cy="95" r="76" strokeDasharray="2 7" opacity=".4" />
@@ -49,30 +49,60 @@ export function AxisInstrument({ axis, value, calibration, disabled, moving, spe
   const unit = calibration ? 'pulsos' : '°'
   const formatted = value === null ? '—' : `${value > 0 ? '+' : ''}${new Intl.NumberFormat('es-MX', { maximumFractionDigits: calibration ? 0 : 2 }).format(value)}`
   return (
-    <CornerBracketPanel className="naval-axis" padded={false}>
-      <header className="naval-axis-header">
-        <div><span className="naval-eyebrow">EJE {axis === 'pan' ? '01 / HORIZONTAL' : '02 / VERTICAL'}</span><h2>{axis.toUpperCase()} <span>{axis === 'pan' ? 'Azimut' : 'Elevación'}</span></h2></div>
-        <span className={`naval-chip ${moving ? 'is-moving' : ''}`}><i />{value === null ? 'SIN DATOS' : moving ? 'EN MOVIMIENTO*' : 'EN ESPERA'}</span>
+    <CornerBracketPanel padded={false}>
+      <header className="flex items-center justify-between gap-2 border-b border-hairline px-5 py-4">
+        <div>
+          <span className="field-label">EJE {axis === 'pan' ? '01 / HORIZONTAL' : '02 / VERTICAL'}</span>
+          <h2 className="mt-1 text-xl normal-case tracking-[0.06em] text-ink">
+            {axis.toUpperCase()} <span className="ml-2 text-xs text-ink-dim normal-case">{axis === 'pan' ? 'Azimut' : 'Elevación'}</span>
+          </h2>
+        </div>
+        <span className={`inline-flex items-center gap-2 whitespace-nowrap font-mono text-[9px] normal-case tracking-[0.08em] ${moving ? 'text-warn' : 'text-ink-dim'}`}>
+          <i className={`h-1.5 w-1.5 ${moving ? 'bg-warn' : 'bg-ink-dim'}`} />
+          {value === null ? 'SIN DATOS' : moving ? 'EN MOVIMIENTO*' : 'EN ESPERA'}
+        </span>
       </header>
-      <div className="naval-instrument">
-        <div className="naval-position">
-          <span className="naval-eyebrow">{calibration ? 'CONTADOR DESDE CERO' : 'POSICIÓN ESTIMADA'}</span>
-          <output aria-label={`${axis} ${calibration ? 'pulsos emitidos' : 'grados estimados'}`} className="naval-number">{formatted}</output>
-          <span className="naval-unit">{calibration ? 'PULSOS STEP EMITIDOS' : 'GRADOS RELATIVOS AL ORIGEN'}</span>
-          <div className="naval-readout"><span>VELOCIDAD MÁX.</span><strong>{speed ?? '—'} <small>pulsos/s</small></strong></div>
+      <div className="grid grid-cols-[1.25fr_1fr] items-center gap-2 px-5 py-6">
+        <div className="min-w-0">
+          <span className="field-label">{calibration ? 'CONTADOR DESDE CERO' : 'POSICIÓN ESTIMADA'}</span>
+          <output aria-label={`${axis} ${calibration ? 'pulsos emitidos' : 'grados estimados'}`} className="text-readout mt-1 block text-ink">{formatted}</output>
+          <span className="field-label">{calibration ? 'PULSOS STEP EMITIDOS' : 'GRADOS RELATIVOS AL ORIGEN'}</span>
+          <div className="mt-4 flex items-center gap-3 border-t border-hairline pt-3 font-mono text-[9px] normal-case text-ink-dim">
+            <span>VELOCIDAD MÁX.</span>
+            <strong className="text-base font-normal normal-case text-ink">{speed ?? '—'} <small className="text-[9px] text-ink-dim">pulsos/s</small></strong>
+          </div>
         </div>
         <AxisDiagram axis={axis} />
       </div>
-      <div className="naval-axis-controls">
-        <div className="naval-input-row"><label htmlFor={`increment-${axis}`}>Incremento por orden</label><div><input id={`increment-${axis}`} aria-label={`Incremento ${axis}`} type="number" min={calibration ? 1 : 0.1} max={maximum} step={calibration ? 1 : 0.1} value={selected} disabled={disabled} onChange={e => setSelected(e.target.value)} /><span>{unit}</span></div></div>
-        <div className="naval-presets" aria-label={`Incrementos rápidos ${axis}`}>
-          {(calibration ? [20, 100, 500, 2000] : [1, 5, 10]).map(n => <button key={n} disabled={disabled} className={parsed === n ? 'selected' : ''} onClick={() => setSelected(String(n))}>{n} {unit}</button>)}
+      <div className="border-t border-hairline bg-void/40 px-5 py-5">
+        <div className="flex items-center justify-between gap-3 border border-hairline bg-panel px-3">
+          <label htmlFor={`increment-${axis}`} className="text-xs normal-case text-ink-dim">Incremento por orden</label>
+          <div className="flex items-center">
+            <input id={`increment-${axis}`} aria-label={`Incremento ${axis}`} type="number" min={calibration ? 1 : 0.1} max={maximum} step={calibration ? 1 : 0.1} value={selected} disabled={disabled} onChange={e => setSelected(e.target.value)} className="w-24 bg-transparent py-2 text-base text-ink" />
+            <span className="field-label pr-1">{unit}</span>
+          </div>
         </div>
-        <div className="naval-direction-controls">
-          <button disabled={disabled || !valid} onClick={() => onMove(-parsed)} aria-label={`Mover ${axis} negativo`}><span>−</span> Mover {axis.toUpperCase()}</button>
-          <button disabled={disabled || !valid} onClick={() => onMove(parsed)} aria-label={`Mover ${axis} positivo`}><span>+</span> Mover {axis.toUpperCase()}</button>
+        <div className="mt-3 flex gap-2" aria-label={`Incrementos rápidos ${axis}`}>
+          {(calibration ? [20, 100, 500, 2000] : [1, 5, 10]).map(n => (
+            <button
+              key={n}
+              disabled={disabled}
+              className={`flex-1 border px-1 py-2 text-[10px] ${parsed === n ? 'border-accent bg-accent/10 text-ink' : 'border-hairline text-ink-dim hover:border-ink-dim'}`}
+              onClick={() => setSelected(String(n))}
+            >
+              {n} {unit}
+            </button>
+          ))}
         </div>
-        {!valid ? <p className="naval-warning">Usa {calibration ? 'un entero' : 'un valor'} entre {calibration ? 1 : 0.1} y {maximum}.</p> : null}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <button disabled={disabled || !valid} onClick={() => onMove(-parsed)} aria-label={`Mover ${axis} negativo`} className="border border-hairline bg-panel px-2 py-3 text-xs text-ink hover:border-ink-dim disabled:opacity-40">
+            <span className="mr-3 text-lg align-middle">−</span> Mover {axis.toUpperCase()}
+          </button>
+          <button disabled={disabled || !valid} onClick={() => onMove(parsed)} aria-label={`Mover ${axis} positivo`} className="border border-hairline bg-panel px-2 py-3 text-xs text-ink hover:border-ink-dim disabled:opacity-40">
+            <span className="mr-3 text-lg align-middle">+</span> Mover {axis.toUpperCase()}
+          </button>
+        </div>
+        {!valid ? <p className="mt-2 text-[10px] normal-case text-warn">Usa {calibration ? 'un entero' : 'un valor'} entre {calibration ? 1 : 0.1} y {maximum}.</p> : null}
       </div>
     </CornerBracketPanel>
   )

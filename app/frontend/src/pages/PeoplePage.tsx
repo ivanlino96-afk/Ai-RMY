@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { usePeople } from '../api/people'
 import { PeopleList } from '../components/people/PeopleList'
 import { EnrollmentFlow } from '../components/people/EnrollmentFlow'
+import { PageHeader } from '../components/hud/PageHeader'
 
 export function PeoplePage() {
   const { data: people, isLoading } = usePeople()
@@ -9,16 +10,19 @@ export function PeoplePage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
-        <h1 className="text-sm tracking-[0.1em] text-ink-dim uppercase">Known faces</h1>
-        <button
-          type="button"
-          onClick={() => setEnrolling(true)}
-          className="border border-hairline px-3 py-2 text-xs uppercase tracking-[0.1em] text-ink hover:border-lock hover:text-lock"
-        >
-          Enroll face
-        </button>
-      </div>
+      <PageHeader
+        code="SYS-02"
+        title="Known faces"
+        action={
+          <button
+            type="button"
+            onClick={() => setEnrolling(true)}
+            className="border border-hairline px-3 py-2 text-xs text-ink hover:border-accent hover:text-accent"
+          >
+            Enroll face
+          </button>
+        }
+      />
 
       {isLoading ? (
         <p className="text-sm text-ink-dim">Loading…</p>

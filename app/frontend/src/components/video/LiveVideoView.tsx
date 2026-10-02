@@ -19,6 +19,10 @@ export function LiveVideoView({ event }: LiveVideoViewProps) {
       />
       <DetectionOverlay event={event} />
       <CenteringReticle event={event} />
+      <div
+        aria-hidden="true"
+        className="animate-scan pointer-events-none absolute inset-x-0 h-1/3 bg-linear-to-b from-transparent via-lock/10 to-transparent"
+      />
     </div>
   )
 }

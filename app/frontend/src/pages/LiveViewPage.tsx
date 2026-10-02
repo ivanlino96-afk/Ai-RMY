@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useDefenseStatus } from '../api/defense'
 import { useGimbalStatus } from '../api/gimbal'
 import { CornerBracketPanel } from '../components/hud/CornerBracketPanel'
+import { PageHeader } from '../components/hud/PageHeader'
 import { CameraSelectPanel } from '../components/status/CameraSelectPanel'
 import { DefenseLogPanel } from '../components/status/DefenseLogPanel'
 import { DefenseModePanel } from '../components/status/DefenseModePanel'
@@ -77,12 +78,20 @@ export function LiveViewPage({ detection }: LiveViewPageProps) {
 
   return (
     <div className="space-y-6 lg:flex lg:h-full lg:flex-col lg:gap-3 lg:space-y-0">
+      <PageHeader code="SYS-01" title="Live view" subtitle="SEGUIMIENTO FACIAL" />
+
       {showFullScreenAlert ? (
         <div className="pointer-events-none fixed inset-0 z-50 border-4 border-alert animate-lock-pulse" />
       ) : null}
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-4 lg:flex-1 lg:min-h-0 lg:items-stretch lg:gap-3 lg:grid-rows-[minmax(0,1fr)]">
-        <div className="lg:col-span-3 lg:h-full lg:min-h-0">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.4fr)_minmax(0,1fr)] lg:flex-1 lg:min-h-0 lg:items-stretch lg:gap-3 lg:grid-rows-[minmax(0,1fr)]">
+        <div className="space-y-6 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-1.5 lg:space-y-0 lg:overflow-hidden">
+          <TrackingModePanel status={status} />
+          <CameraSelectPanel event={detection.event} />
+          <GimbalStatusPanel status={status} />
+        </div>
+
+        <div className="lg:h-full lg:min-h-0">
           <CornerBracketPanel
             title="Camera"
             color={detections.length > 0 ? 'lock' : 'hairline'}
@@ -95,15 +104,12 @@ export function LiveViewPage({ detection }: LiveViewPageProps) {
           </CornerBracketPanel>
         </div>
 
-        <div className="space-y-6 lg:col-span-1 lg:h-full lg:min-h-0 lg:space-y-1.5 lg:overflow-y-auto lg:pr-1">
-          <TrackingModePanel status={status} />
-          <CameraSelectPanel event={detection.event} />
+        <div className="space-y-6 lg:flex lg:h-full lg:min-h-0 lg:flex-col lg:gap-1.5 lg:space-y-0 lg:overflow-hidden">
           <TrackingOffsetPanel
             offset={detection.event?.tracking_offset ?? null}
             frameWidth={detection.event?.frame_width ?? null}
             frameHeight={detection.event?.frame_height ?? null}
           />
-          <GimbalStatusPanel status={status} />
           <DefenseModePanel status={defenseStatus} />
         </div>
       </div>

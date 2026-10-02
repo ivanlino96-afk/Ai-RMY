@@ -1,6 +1,7 @@
 import { useGimbalStatus, useSetTrackingMode } from '../api/gimbal'
 import { useCancelScan, useScanStatus, useStartScan } from '../api/scan'
 import { CornerBracketPanel } from '../components/hud/CornerBracketPanel'
+import { PageHeader } from '../components/hud/PageHeader'
 import { ScanControlPanel } from '../components/status/ScanControlPanel'
 import { ScanRadarView } from '../components/video/ScanRadarView'
 import { useCameraOwner } from '../hooks/useCameraOwner'
@@ -30,6 +31,8 @@ export function RoomScanPage({ detection }: RoomScanPageProps) {
 
   return (
     <div className="space-y-6">
+      <PageHeader code="SYS-04" title="Room scan" subtitle="INVENTARIO DE OBJETOS" />
+
       {trackingEnabled ? (
         <CornerBracketPanel color="warn">
           <div className="flex flex-wrap items-center justify-between gap-3">

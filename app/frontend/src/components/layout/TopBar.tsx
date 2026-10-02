@@ -8,18 +8,21 @@ interface TopBarProps {
 }
 
 const NAV_LINK_CLASS = ({ isActive }: { isActive: boolean }) =>
-  `border-b-2 px-1 pb-3 -mb-px text-xs tracking-[0.1em] uppercase ${
-    isActive ? 'border-lock text-ink' : 'border-transparent text-ink-dim hover:text-ink'
+  `border-b-2 px-1 pb-3 -mb-px font-cond text-xs tracking-[0.1em] uppercase ${
+    isActive ? 'border-accent text-ink' : 'border-transparent text-ink-dim hover:text-ink'
   }`
 
 export function TopBar({ serialConnected, socketConnected }: TopBarProps) {
   return (
     <header className="shrink-0 border-b border-hairline bg-panel px-6">
       <div className="flex items-center justify-between pt-4">
-        <div className="flex items-center gap-8">
-          <span className="text-sm tracking-[0.14em] text-ink">AI-RMY</span>
-          <nav className="flex flex-wrap gap-x-6 gap-y-3">
-            <NavLink to="/" end className={NAV_LINK_CLASS}>
+        <div className="flex items-center gap-4">
+          <span className="font-cond text-lg tracking-[0.1em] text-ink">AI-RMY</span>
+          <span className="border border-hairline px-1.5 py-0.5 font-mono text-[9px] tracking-[0.1em] text-ink-dim normal-case">
+            REV.02
+          </span>
+          <nav className="ml-4 flex flex-wrap gap-x-6 gap-y-3">
+            <NavLink to="/live" className={NAV_LINK_CLASS}>
               Live view
             </NavLink>
             <NavLink to="/people" className={NAV_LINK_CLASS}>
